@@ -1,0 +1,26 @@
+# Source files (use compiled dist instead)
+src/
+
+# Development files
+dev-notes/
+examples/
+tests/
+.vscode/
+.idea/
+
+# Config files
+tsconfig.json
+.gitignore
+.env
+.env.*
+
+# Build artifacts
+*.tsbuildinfo
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/

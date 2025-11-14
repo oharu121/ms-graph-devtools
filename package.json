@@ -1,0 +1,64 @@
+{
+  "name": "ms-graph-devtools",
+  "version": "1.0.0",
+  "description": "TypeScript utility for Microsoft Graph API automation - Outlook, Teams, SharePoint, and Calendar with fluent builders and automatic token management",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./index.js",
+      "require": "./index.js",
+      "types": "./index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "index.js",
+    "index.d.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc -noEmit",
+    "prepublishOnly": "npm run build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "azure",
+    "microsoft-graph",
+    "outlook",
+    "teams",
+    "sharepoint",
+    "calendar",
+    "graph-api",
+    "automation",
+    "email",
+    "adaptive-cards",
+    "typescript",
+    "fluent-api"
+  ],
+  "license": "ISC",
+  "author": "oharu121 <jefflin1201@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oharu121/ms-graph-devtools.git"
+  },
+  "bugs": {
+    "url": "https://github.com/oharu121/ms-graph-devtools/issues"
+  },
+  "homepage": "https://github.com/oharu121/ms-graph-devtools#readme",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "devDependencies": {
+    "@types/jsdom": "^27.0.0",
+    "@types/node": "^24.10.0",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "axios-fluent": "^2.0.2",
+    "dayjs": "^1.11.19",
+    "jsdom": "^27.1.0"
+  }
+}
