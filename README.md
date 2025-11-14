@@ -1,11 +1,11 @@
 # Azure Microsoft Graph Utility
 
-[![npm version](https://badge.fury.io/js/forge-npm-pkg.svg)](https://badge.fury.io/js/forge-npm-pkg)
-![License](https://img.shields.io/npm/l/forge-npm-pkg)
-![Types](https://img.shields.io/npm/types/forge-npm-pkg)
-![NPM Downloads](https://img.shields.io/npm/dw/forge-npm-pkg)
-![Last Commit](https://img.shields.io/github/last-commit/oharu121/forge-npm-pkg)
-![GitHub Stars](https://img.shields.io/github/stars/oharu121/forge-npm-pkg?style=social)
+[![npm version](https://badge.fury.io/js/ms-graph-devtools.svg)](https://badge.fury.io/js/ms-graph-devtools)
+![License](https://img.shields.io/npm/l/ms-graph-devtools)
+![Types](https://img.shields.io/npm/types/ms-graph-devtools)
+![NPM Downloads](https://img.shields.io/npm/dw/ms-graph-devtools)
+![Last Commit](https://img.shields.io/github/last-commit/oharu121/ms-graph-devtools)
+![GitHub Stars](https://img.shields.io/github/stars/oharu121/ms-graph-devtools?style=social)
 
 A TypeScript utility for Microsoft Graph API operations with automatic token management and cross-platform storage support.
 
