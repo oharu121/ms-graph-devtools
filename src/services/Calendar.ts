@@ -1,4 +1,4 @@
-import Axon from "axios-fluent";
+import Axon, { AxonError } from "axios-fluent";
 import { AzureAuth } from "../core/auth";
 import { AzureConfig, Calendar as CalendarType, Holiday } from "../types";
 
@@ -42,7 +42,7 @@ export class Calendar {
       const res = await Axon.new().bearer(token).get(url);
       return res.data.value as CalendarType[];
     } catch (error) {
-      this.auth.handleApiError(error);
+      this.auth.handleApiError(error as AxonError);
     }
   }
 
@@ -95,7 +95,7 @@ export class Calendar {
         date: holiday.start.dateTime,
       }));
     } catch (error) {
-      this.auth.handleApiError(error);
+      this.auth.handleApiError(error as AxonError);
     }
   }
 
@@ -187,7 +187,7 @@ export class Calendar {
         date: holiday.start.dateTime,
       }));
     } catch (error) {
-      this.auth.handleApiError(error);
+      this.auth.handleApiError(error as AxonError);
     }
   }
 }

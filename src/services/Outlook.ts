@@ -1,10 +1,10 @@
-import Axon from "axios-fluent";
+import Axon, { AxonError } from "axios-fluent";
 import dayjs from "dayjs";
 import { JSDOM } from "jsdom";
 import * as fs from "fs";
 import * as path from "path";
 import { AzureAuth } from "../core/auth";
-import { AzureConfig, Mail, MailPayload, Attachment } from "../types";
+import { AzureConfig, Mail, MailPayload } from "../types";
 
 /**
  * Outlook/Mail service for Microsoft Graph API
@@ -60,7 +60,7 @@ export class Outlook {
       const res = await Axon.new().bearer(token).get(url);
       return res.data;
     } catch (error) {
-      this.auth.handleApiError(error);
+      this.auth.handleApiError(error as AxonError);
     }
   }
 
@@ -83,13 +83,13 @@ export class Outlook {
    *   }
    * });
    */
-  async sendMail(payload: any) {
+  async sendMail(payload: MailPayload) {
     try {
       const token = await this.auth.getAccessToken();
       const url = "https://graph.microsoft.com/v1.0/me/sendMail";
       return await Axon.new().bearer(token).post(url, payload);
     } catch (error) {
-      this.auth.handleApiError(error);
+      this.auth.handleApiError(error as AxonError);
     }
   }
 
@@ -142,7 +142,7 @@ export class Outlook {
           receivedDateTime: res.receivedDateTime,
         }));
     } catch (error) {
-      this.auth.handleApiError(error);
+      this.auth.handleApiError(error as AxonError);
     }
   }
 
@@ -406,11 +406,7 @@ export class MailBuilder {
    * @returns Axios response from Microsoft Graph API
    */
   async send() {
-    try {
-      return await this.outlook.sendMail(this.payload);
-    } catch (error) {
-      throw error;
-    }
+    return await this.outlook.sendMail(this.payload);
   }
 
   /**

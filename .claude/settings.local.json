@@ -4,9 +4,12 @@
       "Bash(npx tsc:*)",
       "Bash(npm pack:*)",
       "Bash(npm run build:*)",
-      "Bash(npm run typecheck:*)"
+      "Bash(npm run typecheck:*)",
+      "Bash(npm run lint:*)"
     ],
-    "deny": [],
+    "deny": [
+      "Bash(npm test:*)"
+    ],
     "ask": []
   }
 }

@@ -1,4 +1,4 @@
-import Axon from "axios-fluent";
+import Axon, { AxonError } from "axios-fluent";
 import { AzureAuth } from "../core/auth";
 import { AzureConfig } from "../types";
 
@@ -70,6 +70,7 @@ export class SharePoint {
       const token = await this.auth.getAccessToken();
       const url = `https://graph.microsoft.com/v1.0/sites?search=${query}`;
       const res = await Axon.new().bearer(token).get(url);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return res.data.value.map((site: any) => ({
         id: site.id,
         displayName: site.displayName,
@@ -78,7 +79,7 @@ export class SharePoint {
         description: site.description,
       }));
     } catch (error) {
-      this.auth.handleApiError(error);
+      this.auth.handleApiError(error as AxonError);
     }
   }
 
@@ -105,7 +106,7 @@ export class SharePoint {
         description: res.data.description,
       };
     } catch (error) {
-      this.auth.handleApiError(error);
+      this.auth.handleApiError(error as AxonError);
     }
   }
 
@@ -129,6 +130,7 @@ export class SharePoint {
       const token = await this.auth.getAccessToken();
       const url = `https://graph.microsoft.com/v1.0/sites/${targetSiteId}/lists`;
       const res = await Axon.new().bearer(token).get(url);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return res.data.value.map((list: any) => ({
         id: list.id,
         displayName: list.displayName,
@@ -137,7 +139,7 @@ export class SharePoint {
         webUrl: list.webUrl,
       }));
     } catch (error) {
-      this.auth.handleApiError(error);
+      this.auth.handleApiError(error as AxonError);
     }
   }
 
@@ -163,7 +165,7 @@ export class SharePoint {
       const res = await Axon.new().bearer(token).get(url);
       return res.data;
     } catch (error) {
-      this.auth.handleApiError(error);
+      this.auth.handleApiError(error as AxonError);
     }
   }
 
@@ -202,6 +204,7 @@ export class SharePoint {
       const token = await this.auth.getAccessToken();
       const url = `https://graph.microsoft.com/v1.0/sites/${targetSiteId}/lists/${listId}/items`;
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const params: any = {};
       if (options?.filter) params.$filter = options.filter;
       if (options?.orderby) params.$orderby = options.orderby;
@@ -215,7 +218,7 @@ export class SharePoint {
 
       return res.data.value;
     } catch (error) {
-      this.auth.handleApiError(error);
+      this.auth.handleApiError(error as AxonError);
     }
   }
 
@@ -246,6 +249,7 @@ export class SharePoint {
       const token = await this.auth.getAccessToken();
       const url = `https://graph.microsoft.com/v1.0/sites/${targetSiteId}/lists/${listId}/items/${itemId}`;
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const params: any = {};
       if (expand) params.$expand = expand;
 
@@ -256,7 +260,7 @@ export class SharePoint {
 
       return res.data;
     } catch (error) {
-      this.auth.handleApiError(error);
+      this.auth.handleApiError(error as AxonError);
     }
   }
 
@@ -277,6 +281,7 @@ export class SharePoint {
    */
   async createListItem(
     listId: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     fields: Record<string, any>,
     siteId?: string
   ) {
@@ -294,7 +299,7 @@ export class SharePoint {
       const res = await Axon.new().bearer(token).post(url, payload);
       return res.data;
     } catch (error) {
-      this.auth.handleApiError(error);
+      this.auth.handleApiError(error as AxonError);
     }
   }
 
@@ -315,6 +320,7 @@ export class SharePoint {
   async updateListItem(
     listId: string,
     itemId: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     fields: Record<string, any>,
     siteId?: string
   ) {
@@ -332,7 +338,7 @@ export class SharePoint {
       const res = await Axon.new().bearer(token).patch(url, payload);
       return res.data;
     } catch (error) {
-      this.auth.handleApiError(error);
+      this.auth.handleApiError(error as AxonError);
     }
   }
 
@@ -357,7 +363,7 @@ export class SharePoint {
       const url = `https://graph.microsoft.com/v1.0/sites/${targetSiteId}/lists/${listId}/items/${itemId}`;
       await Axon.new().bearer(token).delete(url);
     } catch (error) {
-      this.auth.handleApiError(error);
+      this.auth.handleApiError(error as AxonError);
     }
   }
 
@@ -381,7 +387,7 @@ export class SharePoint {
         itemIds.map((itemId) => this.deleteListItem(listId, itemId, siteId))
       );
     } catch (error) {
-      this.auth.handleApiError(error);
+      this.auth.handleApiError(error as AxonError);
     }
   }
 
@@ -407,6 +413,7 @@ export class SharePoint {
   async queryAndProcess<T>(
     listId: string,
     filter: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     processor: (item: any) => T,
     deleteAfterProcess: boolean = false,
     siteId?: string
@@ -429,13 +436,14 @@ export class SharePoint {
       const results = items.map(processor);
 
       if (deleteAfterProcess) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const itemIds = items.map((item: any) => item.id);
         await this.deleteListItems(listId, itemIds, siteId);
       }
 
       return results;
     } catch (error) {
-      this.auth.handleApiError(error);
+      this.auth.handleApiError(error as AxonError);
       return [];
     }
   }
@@ -472,7 +480,7 @@ export class SharePoint {
 
       return items && items.length > 0 ? items[0] : undefined;
     } catch (error) {
-      this.auth.handleApiError(error);
+      this.auth.handleApiError(error as AxonError);
     }
   }
 
@@ -497,6 +505,7 @@ export class SharePoint {
       const token = await this.auth.getAccessToken();
       const url = `https://graph.microsoft.com/v1.0/sites/${targetSiteId}/lists/${listId}/columns`;
       const res = await Axon.new().bearer(token).get(url);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return res.data.value.map((column: any) => ({
         id: column.id,
         name: column.name,
@@ -507,7 +516,7 @@ export class SharePoint {
         readOnly: column.readOnly,
       }));
     } catch (error) {
-      this.auth.handleApiError(error);
+      this.auth.handleApiError(error as AxonError);
     }
   }
 }

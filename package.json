@@ -1,14 +1,15 @@
 {
   "name": "ms-graph-devtools",
   "version": "1.0.0",
+  "type": "module",
   "description": "TypeScript utility for Microsoft Graph API automation - Outlook, Teams, SharePoint, and Calendar with fluent builders and automatic token management",
   "main": "index.js",
   "types": "index.d.ts",
   "exports": {
     ".": {
+      "types": "./index.d.ts",
       "import": "./index.js",
-      "require": "./index.js",
-      "types": "./index.d.ts"
+      "require": "./index.js"
     }
   },
   "files": [
@@ -22,7 +23,12 @@
     "build": "tsc",
     "typecheck": "tsc -noEmit",
     "prepublishOnly": "npm run build",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
   "keywords": [
     "azure",
@@ -52,9 +58,17 @@
     "node": ">=14.0.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.1",
     "@types/jsdom": "^27.0.0",
     "@types/node": "^24.10.0",
-    "typescript": "^5.9.3"
+    "@typescript-eslint/eslint-plugin": "^8.47.0",
+    "@typescript-eslint/parser": "^8.47.0",
+    "@vitest/coverage-v8": "^4.0.10",
+    "@vitest/ui": "^4.0.10",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.10"
   },
   "dependencies": {
     "axios-fluent": "^2.0.2",

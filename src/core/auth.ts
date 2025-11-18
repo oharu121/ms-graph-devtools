@@ -1,4 +1,4 @@
-import Axon from "axios-fluent";
+import Axon, { AxonError } from "axios-fluent";
 import os from "os";
 import path from "path";
 import fs from "fs/promises";
@@ -52,6 +52,7 @@ export class AzureAuth {
   private refreshToken: string = "";
   private accessToken: string = "";
   private tokenRefreshPromise: Promise<void> | null = null;
+  private storageLoadPromise: Promise<void> | null = null;
   private tokenProvider?: () => Promise<string> | string;
   private storagePath: string;
   private clientId: string = "";
@@ -274,7 +275,7 @@ export class AzureAuth {
 
       console.info(`Credentials loaded from storage: ${this.storagePath}`);
       return true;
-    } catch (error) {
+    } catch {
       return false;
     }
   }
@@ -283,18 +284,6 @@ export class AzureAuth {
    * Ensure we have required credentials
    */
   private ensureCredentials(): void {
-    if (!this.clientId && process.env.AZURE_CLIENT_ID) {
-      this.clientId = process.env.AZURE_CLIENT_ID;
-    }
-
-    if (!this.clientSecret && process.env.AZURE_CLIENT_SECRET) {
-      this.clientSecret = process.env.AZURE_CLIENT_SECRET;
-    }
-
-    if (!this.tenantId && process.env.AZURE_TENANT_ID) {
-      this.tenantId = process.env.AZURE_TENANT_ID;
-    }
-
     this.updateStoragePath();
 
     if (!this.clientId || !this.clientSecret || !this.tenantId) {
@@ -305,8 +294,7 @@ export class AzureAuth {
           (!this.tenantId ? "  - tenantId\n" : "") +
           "\nProvide via:\n" +
           "1. new Service({ clientId: '...', clientSecret: '...', tenantId: '...' })\n" +
-          "2. Azure.config({ clientId: '...', clientSecret: '...', tenantId: '...' })\n" +
-          "3. Environment variables: AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID\n"
+          "2. Azure.config({ clientId: '...', clientSecret: '...', tenantId: '...' })\n"
       );
     }
   }
@@ -315,28 +303,47 @@ export class AzureAuth {
    * Ensure we have a refresh token
    */
   private async ensureRefreshToken(): Promise<void> {
-    if (this.refreshToken) {
-      return;
-    }
-
-    if (!this.tokenProvider) {
-      const loaded = await this.loadFromStorage();
-      if (loaded && this.refreshToken) {
+    // Wait for any in-flight storage load or token provider call
+    if (this.storageLoadPromise) {
+      await this.storageLoadPromise;
+      if (this.refreshToken) {
         return;
       }
     }
 
-    if (process.env.AZURE_REFRESH_TOKEN) {
-      this.refreshToken = process.env.AZURE_REFRESH_TOKEN;
-      console.info("Loaded refresh token from environment variable");
-      await this.saveToStorage();
+    if (this.refreshToken) {
       return;
     }
 
+    // Try loading from storage first (if no tokenProvider)
+    if (!this.tokenProvider) {
+      // Start the storage load and track the promise
+      this.storageLoadPromise = (async () => {
+        await this.loadFromStorage();
+      })();
+
+      try {
+        await this.storageLoadPromise;
+        if (this.refreshToken) {
+          return;
+        }
+      } finally {
+        this.storageLoadPromise = null;
+      }
+    }
+
+    // Try tokenProvider (with race condition protection)
     if (this.tokenProvider) {
-      this.refreshToken = await this.tokenProvider();
-      console.info("Loaded refresh token from token provider");
-      return;
+      this.storageLoadPromise = (async () => {
+        this.refreshToken = await this.tokenProvider!();
+        console.info("Loaded refresh token from token provider");
+      })();
+      try {
+        await this.storageLoadPromise;
+        return;
+      } finally {
+        this.storageLoadPromise = null;
+      }
     }
 
     throw new Error(
@@ -346,8 +353,7 @@ export class AzureAuth {
         "3. Saved storage file at: " +
         this.storagePath +
         "\n" +
-        "4. AZURE_REFRESH_TOKEN environment variable\n" +
-        "5. tokenProvider function\n\n" +
+        "4. tokenProvider function\n\n" +
         "See documentation for how to obtain a refresh token."
     );
   }
@@ -429,8 +435,8 @@ export class AzureAuth {
   /**
    * Handle API errors (especially 401 for light user mode)
    */
-  handleApiError(error: any): never {
-    if (this.isAccessTokenOnly && error.response?.status === 401) {
+  handleApiError(error: AxonError): never {
+    if (this.isAccessTokenOnly && error.status === 401) {
       throw new Error(
         "Access token is invalid or expired.\n\n" +
           "To continue:\n" +
@@ -465,7 +471,7 @@ export class AzureAuth {
           }
           return { file: file };
         });
-    } catch (error) {
+    } catch {
       return [];
     }
   }
@@ -501,8 +507,8 @@ export class AzureAuth {
           `Cleared all stored credentials (${tokenFiles.length} files)`
         );
       }
-    } catch (error: any) {
-      if (error.code !== "ENOENT") {
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
         console.error("Failed to clear credentials:", error);
       }
     }

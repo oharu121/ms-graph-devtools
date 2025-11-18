@@ -13,11 +13,89 @@ A TypeScript utility for Microsoft Graph API operations with automatic token man
 
 - ✅ **Singleton pattern** - One instance shared across your entire application
 - ✅ **Automatic token refresh** - Handles token expiration transparently
-- ✅ **Multiple token sources** - Direct config, storage, environment variables, or custom provider
+- ✅ **Multiple token sources** - Direct config, storage, or custom provider
 - ✅ **Cross-platform storage** - Works on Windows, Mac, and Linux using XDG standards
 - ✅ **Idempotent initialization** - Safe to call `init()` multiple times
 - ✅ **TypeScript support** - Full type safety and autocomplete
 - ✅ **Method chaining** - Clean, fluent API
+
+## Major Achievement: Three-Tier User System
+
+Successfully designed and implemented a progressive complexity model for Azure authentication that supports all user types from beginners to enterprise.
+
+### Tier 1: Light User (Access Token Only)
+
+**Purpose:** Quick testing, POC, experimentation
+
+**API:**
+
+```typescript
+Azure.setAccessToken("eyJ0eX...").getMe();
+```
+
+**Key Features:**
+
+- Zero setup - paste token and go
+- No credentials required
+- Perfect for testing
+- Expires in ~1 hour
+- No automatic renewal
+
+**Critical Design Decision:**
+
+- ✅ Don't assume `expiredAt` - only set when Azure provides it
+- ✅ Fail gracefully with helpful error message
+- ✅ Don't force users to "upgrade" - respect their choice
+
+### Tier 2: Medium User (Refresh Token)
+
+**Purpose:** Production automation, scheduled tasks, single-tenant apps
+
+**API:**
+
+```typescript
+Azure.init({
+  refreshToken: "xxx",
+  clientId: "...",
+  clientSecret: "...",
+  tenantId: "...",
+});
+```
+
+**Key Features:**
+
+- Automatic token refresh for ~90 days
+- Cross-platform storage (XDG standard)
+- Works for 90% of users
+
+**Storage Strategy:**
+
+- ✅ Store: `refreshToken`, `accessToken`, `clientId`, `tenantId`, `expiresAt`
+- ❌ NEVER store: `clientSecret` (security best practice)
+- Client secret must be provided via init config
+
+### Tier 3: Super User (Token Provider)
+
+**Purpose:** Enterprise apps, multi-tenant SaaS, long-running services
+
+**API:**
+
+```typescript
+Azure.init({
+  clientId: "...",
+  clientSecret: "...",
+  tenantId: "...",
+  tokenProvider: async () => await vault.get("token"),
+});
+```
+
+**Key Features:**
+
+- Never expires (provider handles rotation)
+- Multi-tenant support
+- Integration with secret vaults (HashiCorp Vault, AWS Secrets Manager, etc.)
+- Provider called only when needed
+- Skips storage (provider is source of truth)
 
 ## 🚀 Quick Start
 
@@ -38,8 +116,7 @@ await Azure.init().getMe();
 // Provide token directly
 await Azure.init({ refreshToken: 'your-token' }).sendMail({...});
 
-// Use environment variable
-export AZURE_REFRESH_TOKEN="your-token"
+// Load from storage
 await Azure.init().getCalendars();
 ```
 
@@ -131,9 +208,8 @@ The utility loads tokens in this priority order:
 
 1. **Memory** - Token provided in `init()` config
 2. **Storage** - Saved token file (cross-platform)
-3. **Environment** - `AZURE_REFRESH_TOKEN` env variable
-4. **Provider** - Custom `tokenProvider` callback
-5. **Error** - If none available, throws helpful error
+3. **Provider** - Custom `tokenProvider` callback
+4. **Error** - If none available, throws helpful error
 
 ### Storage Locations
 
@@ -164,19 +240,6 @@ Tokens are automatically saved to platform-specific locations with **multi-tenan
 - ✅ No overwrites when switching configurations
 - ✅ Backward compatible with single-tenant setups
 - ✅ Files created with secure permissions (owner read/write only)
-
-### Environment Variable
-
-```bash
-# Set once
-export AZURE_REFRESH_TOKEN="0.AXoA..."
-export AZURE_CLIENT_ID="your-client-id"
-export AZURE_CLIENT_SECRET="your-client-secret"
-export AZURE_TENANT_ID="your-tenant-id"
-
-# Use anywhere
-node your-script.js
-```
 
 ## 📋 Usage Examples
 
@@ -293,24 +356,30 @@ await Azure.init().getMe();
 
 ### Example 5: CI/CD Environment
 
-```yaml
-# .github/workflows/automation.yml
-env:
-  AZURE_REFRESH_TOKEN: ${{ secrets.AZURE_REFRESH_TOKEN }}
-  AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-  AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-  AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-
-steps:
-  - run: node automation-script.js
-```
-
 ```typescript
 // automation-script.js
 import Azure from 'ms-graph-devtools';
 
-// Loads from environment variables automatically
-await Azure.init().sendMail({...});
+// Load credentials from GitHub Secrets or environment
+const outlook = new Outlook({
+  clientId: process.env.AZURE_CLIENT_ID,
+  clientSecret: process.env.AZURE_CLIENT_SECRET,
+  tenantId: process.env.AZURE_TENANT_ID,
+  refreshToken: process.env.AZURE_REFRESH_TOKEN,
+});
+
+await outlook.sendMail({...});
+```
+
+```yaml
+# .github/workflows/automation.yml
+steps:
+  - run: node automation-script.js
+    env:
+      AZURE_REFRESH_TOKEN: ${{ secrets.AZURE_REFRESH_TOKEN }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
 ```
 
 ## 📚 Service Classes
@@ -640,14 +709,17 @@ tokens.json
 *.token
 ```
 
-### 2. Use Environment Variables in CI/CD
+### 2. Use Secrets in CI/CD
 
-```bash
-# GitHub Secrets
-AZURE_REFRESH_TOKEN
-AZURE_CLIENT_ID
-AZURE_CLIENT_SECRET
-AZURE_TENANT_ID
+Store credentials as GitHub Secrets or CI/CD environment variables and pass them explicitly to the library:
+
+```typescript
+const outlook = new Outlook({
+  clientId: process.env.AZURE_CLIENT_ID,
+  clientSecret: process.env.AZURE_CLIENT_SECRET,
+  tenantId: process.env.AZURE_TENANT_ID,
+  refreshToken: process.env.AZURE_REFRESH_TOKEN,
+});
 ```
 
 ### 3. Secure File Permissions
@@ -698,7 +770,7 @@ A: Platform-specific secure locations:
 
 **Q: Can I use this in serverless/Lambda?**
 
-A: Yes! Use environment variables or a custom `tokenProvider` that fetches from your secret store.
+A: Yes! Use a custom `tokenProvider` that fetches from your secret store (AWS Secrets Manager, etc.).
 
 **Q: Will this work with my organization's SSO (Okta, 1Password, etc.)?**
 
@@ -709,8 +781,7 @@ A: Yes! You obtain the refresh token once through your SSO, then the utility han
 A: Either:
 
 1. `Azure.reset()` then `Azure.init({ refreshToken: 'new-token' })`
-2. Delete the storage file and reinitialize
-3. Update the environment variable and restart
+2. Delete the storage file and reinitialize with a new config
 
 ## 🐛 Troubleshooting
 
@@ -721,9 +792,9 @@ A: Either:
 ```typescript
 Azure.init({ refreshToken: 'xxx' })
 // OR
-export AZURE_REFRESH_TOKEN="xxx"
-// OR
 Azure.init({ tokenProvider: async () => 'xxx' })
+// OR load from storage (if previously saved)
+Azure.init()
 ```
 
 ### "Invalid grant" error

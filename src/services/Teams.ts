@@ -1,4 +1,4 @@
-import Axon from "axios-fluent";
+import Axon, { AxonError } from "axios-fluent";
 import { AzureAuth } from "../core/auth";
 import { AzureConfig, Tag } from "../types";
 
@@ -40,13 +40,14 @@ export class Teams {
       const token = await this.auth.getAccessToken();
       const url = "https://graph.microsoft.com/v1.0/me/joinedTeams";
       const res = await Axon.new().bearer(token).get(url);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return res.data.value.map((team: any) => ({
         id: team.id,
         displayName: team.displayName,
         description: team.description,
       }));
     } catch (error) {
-      this.auth.handleApiError(error);
+      this.auth.handleApiError(error as AxonError);
     }
   }
 
@@ -65,6 +66,7 @@ export class Teams {
       const token = await this.auth.getAccessToken();
       const url = `https://graph.microsoft.com/v1.0/teams/${teamId}/channels`;
       const res = await Axon.new().bearer(token).get(url);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return res.data.value.map((channel: any) => ({
         id: channel.id,
         displayName: channel.displayName,
@@ -72,7 +74,7 @@ export class Teams {
         membershipType: channel.membershipType,
       }));
     } catch (error) {
-      this.auth.handleApiError(error);
+      this.auth.handleApiError(error as AxonError);
     }
   }
 
@@ -91,6 +93,7 @@ export class Teams {
       const token = await this.auth.getAccessToken();
       const url = `https://graph.microsoft.com/v1.0/teams/${teamId}/tags`;
       const res = await Axon.new().bearer(token).get(url);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return res.data.value.map((tag: any) => ({
         id: tag.id,
         displayName: tag.displayName,
@@ -98,7 +101,7 @@ export class Teams {
         memberCount: tag.memberCount,
       }));
     } catch (error) {
-      this.auth.handleApiError(error);
+      this.auth.handleApiError(error as AxonError);
     }
   }
 
@@ -122,6 +125,7 @@ export class Teams {
   async postAdaptiveCard(
     teamId: string,
     channelId: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     card: any,
     tags?: Tag[]
   ) {
@@ -135,7 +139,7 @@ export class Teams {
       const payload = {
         body: {
           contentType: "html",
-          content: `<div><div>${tagText}<attachment id=\"${attachmentId}\"></attachment></div></div>`,
+          content: `<div><div>${tagText}<attachment id="${attachmentId}"></attachment></div></div>`,
         },
         attachments: [
           {
@@ -154,9 +158,9 @@ export class Teams {
       const url = `https://graph.microsoft.com/v1.0/teams/${teamId}/channels/${channelId}/messages`;
       const res = await Axon.new().bearer(token).post(url, payload);
       return res.data;
-    } catch (error: any) {
+    } catch (error) {
       console.error(JSON.stringify(error, null, 2));
-      this.auth.handleApiError(error);
+      this.auth.handleApiError(error as AxonError);
     }
   }
 
@@ -263,6 +267,7 @@ export class AdaptiveCardBuilder {
   private teams: Teams;
   private teamId: string = "";
   private channelId: string = "";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private adaptiveCard: any = null;
   private tags: Tag[] = [];
 
@@ -307,6 +312,7 @@ export class AdaptiveCardBuilder {
    *   ]
    * })
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   card(card: any): AdaptiveCardBuilder {
     this.adaptiveCard = card;
     return this;
@@ -398,15 +404,11 @@ export class AdaptiveCardBuilder {
       throw new Error("Adaptive card is required. Use .card() to set it.");
     }
 
-    try {
-      return await this.teams.postAdaptiveCard(
-        this.teamId,
-        this.channelId,
-        this.adaptiveCard,
-        this.tags.length > 0 ? this.tags : undefined
-      );
-    } catch (error) {
-      throw error;
-    }
+    return await this.teams.postAdaptiveCard(
+      this.teamId,
+      this.channelId,
+      this.adaptiveCard,
+      this.tags.length > 0 ? this.tags : undefined
+    );
   }
 }
