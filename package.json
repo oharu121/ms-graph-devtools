@@ -28,7 +28,9 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "sync": "git pull --rebase && npm install && npm test",
+    "sync:quick": "git pull --rebase && npm install"
   },
   "keywords": [
     "azure",
