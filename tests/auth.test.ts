@@ -360,10 +360,10 @@ describe("AzureAuth - Comprehensive Tests", () => {
       const auth = new AzureAuth({ accessToken: "test" });
 
       const error = {
-        response: { status: 401 },
+        status: 401,
       };
 
-      expect(() => auth.handleApiError(error)).toThrow(
+      expect(() => auth.handleApiError(error as any)).toThrow(
         "Access token is invalid or expired"
       );
     });
