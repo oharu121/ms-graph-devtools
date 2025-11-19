@@ -3,6 +3,27 @@ import { AzureAuth } from "../src/core/auth";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
+import Axon from "axios-fluent";
+
+vi.mock("axios-fluent", () => {
+  const mockAxonInstance = {
+    encodeUrl: vi.fn().mockReturnThis(),
+    post: vi.fn().mockResolvedValue({
+      status: 200,
+      data: {
+        access_token: "mock-access-token",
+        refresh_token: "mock-refresh-token",
+        expires_in: 3600,
+      },
+    }),
+  };
+
+  return {
+    default: {
+      new: vi.fn(() => mockAxonInstance),
+    },
+  };
+});
 
 describe("AzureAuth - Token Storage Race Condition Fix", () => {
   let testStoragePath: string;
@@ -197,10 +218,10 @@ describe("AzureAuth - Token Storage Race Condition Fix", () => {
     it("should call tokenProvider only once despite concurrent requests", async () => {
       let providerCallCount = 0;
 
-      const mockProvider = vi.fn(async () => {
+      const mockProvider = vi.fn(async (callback: string) => {
         providerCallCount++;
         await new Promise((resolve) => setTimeout(resolve, 50));
-        return "provider-refresh-token";
+        return "auth-code-123";
       });
 
       const auth = new AzureAuth({
@@ -220,11 +241,11 @@ describe("AzureAuth - Token Storage Race Condition Fix", () => {
       // Provider should be called only once
       expect(providerCallCount).toBe(1);
       expect(mockProvider).toHaveBeenCalledTimes(1);
-      expect((auth as any).refreshToken).toBe("provider-refresh-token");
+      expect((auth as any).refreshToken).toBe("mock-refresh-token");
     });
 
     it("should skip storage load when tokenProvider is configured", async () => {
-      const mockProvider = vi.fn(async () => "provider-token");
+      const mockProvider = vi.fn(async (callback: string) => "auth-code");
 
       const auth = new AzureAuth({
         clientId: "test-client",
@@ -270,7 +291,7 @@ describe("AzureAuth - Token Storage Race Condition Fix", () => {
     });
 
     it("should handle race between storage and token provider", async () => {
-      const mockProvider = vi.fn(async () => "provider-token");
+      const mockProvider = vi.fn(async (callback: string) => "auth-code");
 
       const auth = new AzureAuth({
         clientId: "test-client",
@@ -291,7 +312,7 @@ describe("AzureAuth - Token Storage Race Condition Fix", () => {
       // Provider should be used (storage skipped when provider exists)
       expect(loadSpy).not.toHaveBeenCalled();
       expect(mockProvider).toHaveBeenCalledTimes(1);
-      expect((auth as any).refreshToken).toBe("provider-token");
+      expect((auth as any).refreshToken).toBe("mock-refresh-token");
 
       loadSpy.mockRestore();
     });
@@ -303,7 +324,7 @@ describe("AzureAuth - Token Storage Race Condition Fix", () => {
         clientId: "test-client",
         clientSecret: "test-secret",
         tenantId: "test-tenant",
-        tokenProvider: async () => "test-token",
+        tokenProvider: async (callback: string) => "auth-code",
       });
 
       // Before call
@@ -321,9 +342,9 @@ describe("AzureAuth - Token Storage Race Condition Fix", () => {
     });
 
     it("should reuse existing storageLoadPromise for concurrent calls", async () => {
-      const mockProvider = vi.fn(async () => {
+      const mockProvider = vi.fn(async (callback: string) => {
         await new Promise((resolve) => setTimeout(resolve, 100));
-        return "test-token";
+        return "auth-code";
       });
 
       const auth = new AzureAuth({
@@ -353,7 +374,7 @@ describe("AzureAuth - Token Storage Race Condition Fix", () => {
 
   describe("Error Handling", () => {
     it("should clear storageLoadPromise even if loading fails", async () => {
-      const mockProvider = vi.fn(async () => {
+      const mockProvider = vi.fn(async (callback: string) => {
         throw new Error("Provider failed");
       });
 
@@ -374,12 +395,12 @@ describe("AzureAuth - Token Storage Race Condition Fix", () => {
 
     it("should allow retry after failed provider call", async () => {
       let callCount = 0;
-      const mockProvider = vi.fn(async () => {
+      const mockProvider = vi.fn(async (callback: string) => {
         callCount++;
         if (callCount === 1) {
           throw new Error("First call failed");
         }
-        return "success-token";
+        return "auth-code";
       });
 
       const auth = new AzureAuth({
@@ -396,7 +417,7 @@ describe("AzureAuth - Token Storage Race Condition Fix", () => {
 
       // Second call should succeed
       await (auth as any).ensureRefreshToken();
-      expect((auth as any).refreshToken).toBe("success-token");
+      expect((auth as any).refreshToken).toBe("mock-refresh-token");
       expect(mockProvider).toHaveBeenCalledTimes(2);
     });
   });

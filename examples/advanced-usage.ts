@@ -47,27 +47,38 @@ async function example1_SharedAuth() {
 // ============================================
 async function example2_TokenProvider() {
   // For infinite token renewal
-  // Useful when integrating with external token vaults
+  // Useful when integrating with Playwright for automated OAuth flow
   const outlook = new Outlook({
     clientId: '...',
     clientSecret: '...',
     tenantId: '...',
-    tokenProvider: async () => {
-      // Fetch token from your secure vault
-      // This gets called automatically when token needs refresh
-      const token = await fetchFromVault('azure-refresh-token');
-      return token;
+    tokenProvider: async (callback: string) => {
+      // callback contains the OAuth authorization URL
+      // Use Playwright or similar to automate the login flow
+      // and return the authorization code
+      const code = await getAzureCodeWithPlaywright(callback);
+      return code;
     }
   });
 
   await outlook.compose().subject('Test').to(['test@example.com']).send();
 }
 
-// Simulated vault function
-async function fetchFromVault(key: string): Promise<string> {
-  // In production, this would fetch from your secure vault
-  // (Azure Key Vault, HashiCorp Vault, AWS Secrets Manager, etc.)
-  return process.env.AZURE_REFRESH_TOKEN || '';
+// Simulated Playwright function
+async function getAzureCodeWithPlaywright(callback: string): Promise<string> {
+  // In production, this would use Playwright to:
+  // 1. Navigate to the callback URL
+  // 2. Automate the login process
+  // 3. Extract and return the authorization code from the redirect
+  //
+  // Example implementation:
+  // const page = await browser.newPage();
+  // await page.goto(callback);
+  // // ... handle login ...
+  // const url = page.url();
+  // return url.split('code=')[1].split('&')[0];
+
+  return 'authorization-code-from-playwright';
 }
 
 // ============================================

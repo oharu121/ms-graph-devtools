@@ -4,6 +4,20 @@ import fs from "fs/promises";
 import path from "path";
 import os from "os";
 import type { AzureConfig } from "../src/types";
+import Axon from "axios-fluent";
+
+vi.mock("axios-fluent", () => {
+  const mockAxonInstance = {
+    encodeUrl: vi.fn().mockReturnThis(),
+    post: vi.fn(),
+  };
+
+  return {
+    default: {
+      new: vi.fn(() => mockAxonInstance),
+    },
+  };
+});
 
 describe("AzureAuth - Comprehensive Tests", () => {
   let testStoragePath: string;
@@ -236,7 +250,7 @@ describe("AzureAuth - Comprehensive Tests", () => {
 
     it("should not save when using token provider", async () => {
       const auth = new AzureAuth({
-        tokenProvider: async () => "test",
+        tokenProvider: async (callback: string) => "test-code",
       });
       const saveSpy = vi.spyOn(fs, "writeFile");
 
@@ -292,8 +306,26 @@ describe("AzureAuth - Comprehensive Tests", () => {
   });
 
   describe("Token Provider", () => {
-    it("should call token provider when no refresh token", async () => {
-      const mockProvider = vi.fn(async () => "provider-token");
+    it("should call token provider with callback URL when no refresh token", async () => {
+      const mockProvider = vi.fn(async (callback: string) => {
+        // Verify callback URL contains expected parameters
+        expect(callback).toContain("login.microsoftonline.com");
+        expect(callback).toContain("test-tenant");
+        expect(callback).toContain("client_id=test-client");
+        expect(callback).toContain("response_type=code");
+        return "auth-code-123";
+      });
+
+      // Mock the token exchange response
+      const mockAxonInstance = (Axon.new as any)();
+      mockAxonInstance.post.mockResolvedValueOnce({
+        status: 200,
+        data: {
+          access_token: "new-access-token",
+          refresh_token: "provider-refresh-token",
+          expires_in: 3600,
+        },
+      });
 
       const auth = new AzureAuth({
         clientId: "test-client",
@@ -305,22 +337,34 @@ describe("AzureAuth - Comprehensive Tests", () => {
       await (auth as any).ensureRefreshToken();
 
       expect(mockProvider).toHaveBeenCalled();
-      expect((auth as any).refreshToken).toBe("provider-token");
+      expect((auth as any).refreshToken).toBe("provider-refresh-token");
+      expect((auth as any).accessToken).toBe("new-access-token");
     });
 
     it("should handle synchronous token provider", async () => {
-      const mockProvider = vi.fn(() => "sync-token");
+      const mockProvider = vi.fn((callback: string) => "sync-auth-code");
+
+      // Mock the token exchange response
+      const mockAxonInstance = (Axon.new as any)();
+      mockAxonInstance.post.mockResolvedValueOnce({
+        status: 200,
+        data: {
+          access_token: "sync-access-token",
+          refresh_token: "sync-refresh-token",
+          expires_in: 3600,
+        },
+      });
 
       const auth = new AzureAuth({
         clientId: "test-client",
         clientSecret: "test-secret",
         tenantId: "test-tenant",
-        tokenProvider: mockProvider as any,
+        tokenProvider: mockProvider,
       });
 
       await (auth as any).ensureRefreshToken();
 
-      expect((auth as any).refreshToken).toBe("sync-token");
+      expect((auth as any).refreshToken).toBe("sync-refresh-token");
     });
   });
 

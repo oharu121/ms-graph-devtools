@@ -53,7 +53,7 @@ export class AzureAuth {
   private accessToken: string = "";
   private tokenRefreshPromise: Promise<void> | null = null;
   private storageLoadPromise: Promise<void> | null = null;
-  private tokenProvider?: () => Promise<string> | string;
+  private tokenProvider?: (callback: string) => Promise<string> | string;
   private storagePath: string;
   private clientId: string = "";
   private clientSecret: string = "";
@@ -332,11 +332,11 @@ export class AzureAuth {
       }
     }
 
-    // Try tokenProvider (with race condition protection)
+    // Try tokenProvider via forgeRefreshToken (with race condition protection)
     if (this.tokenProvider) {
       this.storageLoadPromise = (async () => {
-        this.refreshToken = await this.tokenProvider!();
-        console.info("Loaded refresh token from token provider");
+        await this.forgeRefreshToken();
+        console.info("Obtained tokens from token provider");
       })();
       try {
         await this.storageLoadPromise;
@@ -385,6 +385,69 @@ export class AzureAuth {
       } finally {
         this.tokenRefreshPromise = null;
       }
+    }
+  }
+
+  /**
+   * Forge new refresh token via OAuth authorization code flow
+   * Uses tokenProvider to get authorization code, then exchanges for tokens
+   */
+  private async forgeRefreshToken(): Promise<void> {
+    if (!this.tokenProvider) {
+      throw new Error(
+        "No token provider configured. Please provide one via:\n" +
+          "1. new Service({ tokenProvider: async (callback) => { ... } })\n" +
+          "2. Provide refreshToken directly: new Service({ refreshToken: '...' })\n" +
+          "\nExample with Playwright:\n" +
+          "  new Outlook({\n" +
+          "    tokenProvider: async (callback) => await Playwright.getAzureCode(callback)\n" +
+          "  })\n"
+      );
+    }
+
+    const callback =
+      `https://login.microsoftonline.com/${this.tenantId}/oauth2/v2.0/authorize?` +
+      [
+        `client_id=${this.clientId}`,
+        "response_type=code",
+        `redirect_uri=${REDIRECT_URI}`,
+        `scope=${this.scopes.join("%20")}`,
+        "response_mode=query",
+      ].join("&");
+
+    const code = await this.tokenProvider(callback);
+
+    const url = `https://login.microsoftonline.com/${this.tenantId}/oauth2/v2.0/token`;
+
+    const reqTokenBody = {
+      client_id: this.clientId,
+      client_secret: this.clientSecret,
+      code: code,
+      redirect_uri: REDIRECT_URI,
+      grant_type: "authorization_code",
+      scope: this.scopes.join(" "),
+    };
+
+    try {
+      const res = await Axon.new({ allowInsecure: this.allowInsecure })
+        .encodeUrl()
+        .post(url, reqTokenBody);
+
+      if (res.status === 200) {
+        this.accessToken = res.data.access_token;
+        this.expiredAt = Date.now() + res.data.expires_in * 1000;
+        this.refreshToken = res.data.refresh_token;
+      } else {
+        console.error(
+          `Failed to forge refresh token: ${res.status} ${JSON.stringify(
+            res.data
+          )}`
+        );
+        throw new Error("Failed to forge refresh token");
+      }
+    } catch (error) {
+      console.error("Error forging refresh token:", error);
+      throw error;
     }
   }
 

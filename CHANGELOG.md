@@ -5,6 +5,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **⚠️ BREAKING: Updated tokenProvider signature**
+  - `tokenProvider` now receives the OAuth callback URL as a parameter
+  - Old: `tokenProvider?: () => Promise<string> | string`
+  - New: `tokenProvider?: (callback: string) => Promise<string> | string`
+  - The callback URL contains all OAuth parameters (tenantId, clientId, scopes, redirectUri)
+  - tokenProvider should return the authorization code (not refresh token)
+  - Library now handles the code-to-token exchange internally via `forgeRefreshToken()`
+
+### Added
+- **OAuth Authorization Code Flow**: New `forgeRefreshToken()` method
+  - Constructs OAuth authorization URL with configured parameters
+  - Exchanges authorization code for access_token, refresh_token, and expires_in
+  - Enables full Playwright integration for automated authentication
+
+### Migration Guide
+
+If you're using tokenProvider, update your implementation:
+
+**Before:**
+```typescript
+const outlook = new Outlook({
+  tokenProvider: async () => {
+    // Return refresh token from vault
+    return await fetchFromVault('azure-refresh-token');
+  }
+});
+```
+
+**After:**
+```typescript
+const outlook = new Outlook({
+  tokenProvider: async (callback: string) => {
+    // callback contains the OAuth authorization URL
+    // Use Playwright to navigate, login, and extract the code
+    const code = await Playwright.getAzureCode(callback);
+    return code;
+  }
+});
+```
+
 ## [1.1.0]
 
 ### Added

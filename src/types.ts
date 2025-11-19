@@ -17,8 +17,9 @@ export interface AzureConfig {
   // Medium user: refresh token
   refreshToken?: string;
 
-  // Super user: token provider
-  tokenProvider?: () => Promise<string> | string;
+  // Super user: token provider (e.g., Playwright.getAzureCode)
+  // Will be called with OAuth callback URL when authorization code is needed
+  tokenProvider?: (callback: string) => Promise<string> | string;
 
   // Required credentials (can come from env variables)
   clientId?: string;
