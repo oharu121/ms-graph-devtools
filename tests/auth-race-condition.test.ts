@@ -3,7 +3,6 @@ import { AzureAuth } from "../src/core/auth";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
-import Axon from "axios-fluent";
 
 vi.mock("axios-fluent", () => {
   const mockAxonInstance = {
@@ -218,7 +217,7 @@ describe("AzureAuth - Token Storage Race Condition Fix", () => {
     it("should call tokenProvider only once despite concurrent requests", async () => {
       let providerCallCount = 0;
 
-      const mockProvider = vi.fn(async (callback: string) => {
+      const mockProvider = vi.fn(async (_callback: string) => {
         providerCallCount++;
         await new Promise((resolve) => setTimeout(resolve, 50));
         return "auth-code-123";
@@ -245,7 +244,7 @@ describe("AzureAuth - Token Storage Race Condition Fix", () => {
     });
 
     it("should skip storage load when tokenProvider is configured", async () => {
-      const mockProvider = vi.fn(async (callback: string) => "auth-code");
+      const mockProvider = vi.fn(async (_callback: string) => "auth-code");
 
       const auth = new AzureAuth({
         clientId: "test-client",
@@ -291,7 +290,7 @@ describe("AzureAuth - Token Storage Race Condition Fix", () => {
     });
 
     it("should handle race between storage and token provider", async () => {
-      const mockProvider = vi.fn(async (callback: string) => "auth-code");
+      const mockProvider = vi.fn(async (_callback: string) => "auth-code");
 
       const auth = new AzureAuth({
         clientId: "test-client",
@@ -324,7 +323,7 @@ describe("AzureAuth - Token Storage Race Condition Fix", () => {
         clientId: "test-client",
         clientSecret: "test-secret",
         tenantId: "test-tenant",
-        tokenProvider: async (callback: string) => "auth-code",
+        tokenProvider: async (_callback: string) => "auth-code",
       });
 
       // Before call
@@ -342,7 +341,7 @@ describe("AzureAuth - Token Storage Race Condition Fix", () => {
     });
 
     it("should reuse existing storageLoadPromise for concurrent calls", async () => {
-      const mockProvider = vi.fn(async (callback: string) => {
+      const mockProvider = vi.fn(async (_callback: string) => {
         await new Promise((resolve) => setTimeout(resolve, 100));
         return "auth-code";
       });
@@ -374,7 +373,7 @@ describe("AzureAuth - Token Storage Race Condition Fix", () => {
 
   describe("Error Handling", () => {
     it("should clear storageLoadPromise even if loading fails", async () => {
-      const mockProvider = vi.fn(async (callback: string) => {
+      const mockProvider = vi.fn(async (_callback: string) => {
         throw new Error("Provider failed");
       });
 
@@ -395,7 +394,7 @@ describe("AzureAuth - Token Storage Race Condition Fix", () => {
 
     it("should allow retry after failed provider call", async () => {
       let callCount = 0;
-      const mockProvider = vi.fn(async (callback: string) => {
+      const mockProvider = vi.fn(async (_callback: string) => {
         callCount++;
         if (callCount === 1) {
           throw new Error("First call failed");

@@ -4,14 +4,14 @@ import fs from "fs/promises";
 import path from "path";
 import os from "os";
 import type { AzureConfig } from "../src/types";
-import Axon from "axios-fluent";
+
+const mockPost = vi.fn();
+const mockAxonInstance = {
+  encodeUrl: vi.fn().mockReturnThis(),
+  post: mockPost,
+};
 
 vi.mock("axios-fluent", () => {
-  const mockAxonInstance = {
-    encodeUrl: vi.fn().mockReturnThis(),
-    post: vi.fn(),
-  };
-
   return {
     default: {
       new: vi.fn(() => mockAxonInstance),
@@ -250,7 +250,7 @@ describe("AzureAuth - Comprehensive Tests", () => {
 
     it("should not save when using token provider", async () => {
       const auth = new AzureAuth({
-        tokenProvider: async (callback: string) => "test-code",
+        tokenProvider: async (_callback: string) => "test-code",
       });
       const saveSpy = vi.spyOn(fs, "writeFile");
 
@@ -317,8 +317,7 @@ describe("AzureAuth - Comprehensive Tests", () => {
       });
 
       // Mock the token exchange response
-      const mockAxonInstance = (Axon.new as any)();
-      mockAxonInstance.post.mockResolvedValueOnce({
+      mockPost.mockResolvedValueOnce({
         status: 200,
         data: {
           access_token: "new-access-token",
@@ -342,11 +341,10 @@ describe("AzureAuth - Comprehensive Tests", () => {
     });
 
     it("should handle synchronous token provider", async () => {
-      const mockProvider = vi.fn((callback: string) => "sync-auth-code");
+      const mockProvider = vi.fn((_callback: string) => "sync-auth-code");
 
       // Mock the token exchange response
-      const mockAxonInstance = (Axon.new as any)();
-      mockAxonInstance.post.mockResolvedValueOnce({
+      mockPost.mockResolvedValueOnce({
         status: 200,
         data: {
           access_token: "sync-access-token",
