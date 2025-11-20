@@ -57,7 +57,7 @@
   },
   "homepage": "https://github.com/oharu121/ms-graph-devtools#readme",
   "engines": {
-    "node": ">=14.0.0"
+    "node": ">=20.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

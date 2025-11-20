@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `Azure.reset()` now clears all service instances for clean state
 
 ### Changed
+- **⚠️ BREAKING: Dropped Node.js 18 support**
+  - Minimum Node.js version is now 20.0.0
+  - Node.js 18 reached End-of-Life on April 30, 2025
+  - This change enables better compatibility with modern dependencies
 - **⚠️ API Improvement: Simplified service access pattern**
   - **Before**: `Azure.config({...}); const outlook = new Outlook(); await outlook.sendMail({...});`
   - **After**: `Azure.config({...}); await Azure.outlook.sendMail({...});`
