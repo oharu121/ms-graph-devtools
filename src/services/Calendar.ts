@@ -1,4 +1,3 @@
-import Axon, { AxonError } from "axios-fluent";
 import { AzureAuth } from "../core/auth";
 import { AzureConfig, Calendar as CalendarType, Holiday } from "../types";
 
@@ -36,14 +35,13 @@ export class Calendar {
    * console.log(calendars.map(c => c.name));
    */
   async getCalendars(): Promise<CalendarType[]> {
-    try {
+    await this.auth.checkToken();
+    return this.auth.withRetry(async () => {
       const token = await this.auth.getAccessToken();
       const url = `https://graph.microsoft.com/v1.0/me/calendars`;
-      const res = await Axon.new().bearer(token).get(url);
+      const res = await this.auth.getAxon().bearer(token).get(url);
       return res.data.value as CalendarType[];
-    } catch (error) {
-      this.auth.handleApiError(error as AxonError);
-    }
+    });
   }
 
   /**
@@ -66,7 +64,8 @@ export class Calendar {
     start: string,
     end: string
   ): Promise<Holiday[]> {
-    try {
+    await this.auth.checkToken();
+    return this.auth.withRetry(async () => {
       const token = await this.auth.getAccessToken();
       const calendars = await this.getCalendars();
       const targetCalendar = calendars.find(
@@ -83,7 +82,7 @@ export class Calendar {
       };
 
       const url = `https://graph.microsoft.com/v1.0/me/calendars/${targetCalendar.id}/calendarView`;
-      const res = await Axon.new()
+      const res = await this.auth.getAxon()
         .bearer(token)
         .params(params)
         .get(url);
@@ -94,9 +93,7 @@ export class Calendar {
         name: holiday.subject,
         date: holiday.start.dateTime,
       }));
-    } catch (error) {
-      this.auth.handleApiError(error as AxonError);
-    }
+    });
   }
 
   /**
@@ -156,7 +153,8 @@ export class Calendar {
     end: string,
     calendarNames: string[] = ["Japan holidays", "日本 の休日"]
   ): Promise<Holiday[]> {
-    try {
+    await this.auth.checkToken();
+    return this.auth.withRetry(async () => {
       const token = await this.auth.getAccessToken();
       const calendars = await this.getCalendars();
       const japanCalendar = calendars.find((calendar) =>
@@ -175,7 +173,7 @@ export class Calendar {
       };
 
       const url = `https://graph.microsoft.com/v1.0/me/calendars/${japanCalendar.id}/calendarView`;
-      const res = await Axon.new()
+      const res = await this.auth.getAxon()
         .bearer(token)
         .params(params)
         .get(url);
@@ -186,8 +184,6 @@ export class Calendar {
         name: holiday.subject,
         date: holiday.start.dateTime,
       }));
-    } catch (error) {
-      this.auth.handleApiError(error as AxonError);
-    }
+    });
   }
 }

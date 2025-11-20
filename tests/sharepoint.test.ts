@@ -22,7 +22,9 @@ describe("SharePoint Service", () => {
     });
 
     vi.spyOn(mockAuth, "getAccessToken");
-    vi.spyOn(mockAuth, "handleApiError");
+    vi.spyOn(mockAuth, "checkToken");
+    vi.spyOn(mockAuth, "withRetry").mockImplementation(async (fn) => await fn());
+    vi.spyOn(mockAuth, "getAxon").mockImplementation(() => Axon.new());
   });
 
   describe("Constructor", () => {
@@ -111,17 +113,14 @@ describe("SharePoint Service", () => {
 
     it("should handle API errors", async () => {
       const mockError = new Error("Search failed");
-      const mockAxonInstance = {
-        bearer: vi.fn().mockReturnThis(),
-        get: vi.fn().mockRejectedValue(mockError),
-      };
 
-      (Axon.new as any).mockReturnValue(mockAxonInstance);
+      // Mock withRetry to throw the error
+      vi.spyOn(mockAuth, "withRetry").mockRejectedValue(mockError);
 
       await expect(sharepoint.searchSites("test")).rejects.toThrow(
         "Search failed"
       );
-      expect(mockAuth.handleApiError).toHaveBeenCalledWith(mockError);
+      expect(mockAuth.withRetry).toHaveBeenCalled();
     });
   });
 
@@ -585,29 +584,21 @@ describe("SharePoint Service", () => {
       expect(result).toEqual([]);
     });
 
-    it("should return empty array on error", async () => {
+    it("should throw error on failure", async () => {
       const mockError = new Error("Query failed");
-      const mockAxonInstance = {
-        bearer: vi.fn().mockReturnThis(),
-        params: vi.fn().mockReturnThis(),
-        get: vi.fn().mockRejectedValue(mockError),
-      };
 
-      (Axon.new as any).mockReturnValue(mockAxonInstance);
+      // Mock withRetry to throw the error
+      vi.spyOn(mockAuth, "withRetry").mockRejectedValue(mockError);
 
-      // Mock handleApiError to not throw (just log)
-      vi.spyOn(mockAuth, "handleApiError").mockImplementation(() => {
-        // Don't throw, just return
-      });
-
-      const result = await sharepoint.queryAndProcess(
-        "Tasks",
-        "filter",
-        (item) => item,
-        false
-      );
-
-      expect(result).toEqual([]);
+      await expect(
+        sharepoint.queryAndProcess(
+          "Tasks",
+          "filter",
+          (item) => item,
+          false
+        )
+      ).rejects.toThrow("Query failed");
+      expect(mockAuth.withRetry).toHaveBeenCalled();
     });
   });
 

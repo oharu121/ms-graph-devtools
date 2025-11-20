@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0]
+
+### Added
+- **Automatic Token Refresh & Retry Mechanism** (inspired by fs-box-sync)
+  - Added `withRetry()` wrapper for all API operations - automatically retries on 401 errors
+  - Added `invalidateAndRefresh()` for smart token recovery (refresh token → token provider fallback)
+  - Added `enhanceError()` for user-friendly error messages (401, 404, 403, 409, 500+ status codes)
+  - Added `isRetrying` flag to prevent infinite retry loops
+  - **All 23 service methods** across 4 files now use `checkToken()` + `withRetry()` + `getAxon()` pattern
+  - Zero legacy try-catch + handleApiError patterns remaining
+
+- **Centralized SSL Configuration**
+  - Added `getAxon()` helper method - returns `Axon.dev()` when `allowInsecure: true`, `Axon.new()` otherwise
+  - `allowInsecure` option now applies to ALL API calls (auth + services), not just token endpoints
+  - Created comprehensive test suite for `allowInsecure` option (`tests/allow-insecure.test.ts`)
+
+### Fixed
+- **Token Storage with Token Provider** - Tokens obtained from `tokenProvider` are now saved to storage
+  - Previously: Storage was skipped when `tokenProvider` was configured, causing provider to be called on every execution
+  - Now: Tokens are cached to storage even with `tokenProvider`, reducing unnecessary provider calls
+  - Matches fs-box-sync behavior: only skips storage for access-token-only mode
+  - Storage now happens after both `refreshAccessToken()` and `forgeRefreshToken()`
+
+- **SSL Verification with allowInsecure** - Setting `allowInsecure: true` now works correctly
+  - Previously: Only applied to auth endpoints, service API calls still used secure SSL
+  - Now: All HTTP requests (auth + services) respect the `allowInsecure` setting
+  - Uses centralized `getAxon()` method for consistent behavior across all 23 service methods
+  - Removed all legacy `Axon.new()` direct calls from service files
+
+- **401 Error Handling** - API calls now automatically recover from authentication failures
+  - Previously: 401 errors caused immediate failures with generic error messages
+  - Now: Automatic token refresh + single retry on 401 errors
+  - Fallback chain: refresh token → token provider → helpful error message
+  - Prevents cascading failures and improves user experience
+
 ## [1.2.0]
 
 ### Added
@@ -15,11 +50,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Lazy initialization: services only created when first accessed
   - `Azure.reset()` now clears all service instances for clean state
 
+- **Automatic Token Refresh & Retry Mechanism** (inspired by fs-box-sync)
+  - Added `withRetry()` wrapper for all API operations - automatically retries on 401 errors
+  - Added `invalidateAndRefresh()` for smart token recovery (refresh token → token provider fallback)
+  - Added `enhanceError()` for user-friendly error messages (401, 404, 403, 409, 500+ status codes)
+  - Added `isRetrying` flag to prevent infinite retry loops
+  - **All 23 service methods** across 4 files now use `checkToken()` + `withRetry()` + `getAxon()` pattern
+  - Zero legacy try-catch + handleApiError patterns remaining
+
+- **Centralized SSL Configuration**
+  - Added `getAxon()` helper method - returns `Axon.dev()` when `allowInsecure: true`, `Axon.new()` otherwise
+  - `allowInsecure` option now applies to ALL API calls (auth + services), not just token endpoints
+  - Created comprehensive test suite for `allowInsecure` option (`tests/allow-insecure.test.ts`)
+
 ### Changed
 - **⚠️ BREAKING: Dropped Node.js 18 support**
   - Minimum Node.js version is now 20.0.0
   - Node.js 18 reached End-of-Life on April 30, 2025
   - This change enables better compatibility with modern dependencies
+
 - **⚠️ API Improvement: Simplified service access pattern**
   - **Before**: `Azure.config({...}); const outlook = new Outlook(); await outlook.sendMail({...});`
   - **After**: `Azure.config({...}); await Azure.outlook.sendMail({...});`
@@ -28,6 +77,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Calling `Azure.config()` resets all service instances to pick up new configuration
   - Old pattern (`new Outlook()`) still works for advanced use cases
 
+### Fixed
+- **Token Storage with Token Provider** - Tokens obtained from `tokenProvider` are now saved to storage
+  - Previously: Storage was skipped when `tokenProvider` was configured, causing provider to be called on every execution
+  - Now: Tokens are cached to storage even with `tokenProvider`, reducing unnecessary provider calls
+  - Matches fs-box-sync behavior: only skips storage for access-token-only mode
+  - Storage now happens after both `refreshAccessToken()` and `forgeRefreshToken()`
+
+- **SSL Verification with allowInsecure** - Setting `allowInsecure: true` now works correctly
+  - Previously: Only applied to auth endpoints, service API calls still used secure SSL
+  - Now: All HTTP requests (auth + services) respect the `allowInsecure` setting
+  - Uses centralized `getAxon()` method for consistent behavior across all 23 service methods
+  - Removed all legacy `Axon.new()` direct calls from service files
+
+- **401 Error Handling** - API calls now automatically recover from authentication failures
+  - Previously: 401 errors caused immediate failures with generic error messages
+  - Now: Automatic token refresh + single retry on 401 errors
+  - Fallback chain: refresh token → token provider → helpful error message
+  - Prevents cascading failures and improves user experience
+
 ### Documentation
 - Complete README rewrite to showcase new API pattern
 - Updated all examples to use `Azure.service` syntax
@@ -35,6 +103,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated Three-Tier User System examples
 - Updated Service Usage Patterns section
 - Clarified FAQ and troubleshooting for new API
+- Created `MIGRATION_SUMMARY.md` documenting fs-box-sync pattern migration
+- Updated dev notes with detailed implementation learnings
 
 ### Migration Guide
 

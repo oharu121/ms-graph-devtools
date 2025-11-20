@@ -38,7 +38,9 @@ describe("Calendar Service", () => {
 
     // Spy on methods
     vi.spyOn(mockAuth, "getAccessToken");
-    vi.spyOn(mockAuth, "handleApiError");
+    vi.spyOn(mockAuth, "checkToken");
+    vi.spyOn(mockAuth, "withRetry").mockImplementation(async (fn) => await fn());
+    vi.spyOn(mockAuth, "getAxon").mockImplementation(() => Axon.new());
   });
 
   describe("Constructor", () => {
@@ -95,15 +97,12 @@ describe("Calendar Service", () => {
 
     it("should handle API errors", async () => {
       const mockError = new Error("API Error");
-      const mockAxonInstance = {
-        bearer: vi.fn().mockReturnThis(),
-        get: vi.fn().mockRejectedValue(mockError),
-      };
 
-      (Axon.new as any).mockReturnValue(mockAxonInstance);
+      // Mock withRetry to throw the error
+      vi.spyOn(mockAuth, "withRetry").mockRejectedValue(mockError);
 
       await expect(calendar.getCalendars()).rejects.toThrow("API Error");
-      expect(mockAuth.handleApiError).toHaveBeenCalledWith(mockError);
+      expect(mockAuth.withRetry).toHaveBeenCalled();
     });
   });
 

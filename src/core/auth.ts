@@ -62,6 +62,116 @@ export class AzureAuth {
   private scopes: string[] = DEFAULT_SCOPES;
   private scopesConfigured: boolean = false;
   private allowInsecure: boolean = false;
+  private isRetrying: boolean = false;
+
+  /**
+   * Get configured Axon instance with appropriate security settings
+   * Uses Axon.dev() when allowInsecure is true, Axon.new() otherwise
+   */
+  getAxon() {
+    return this.allowInsecure ? Axon.dev() : Axon.new();
+  }
+
+  /**
+   * Wrapper for API requests with automatic 401 retry
+   * @param operation The API operation to execute
+   * @returns The result of the operation
+   */
+  async withRetry<T>(operation: () => Promise<T>): Promise<T> {
+    try {
+      return await operation();
+    } catch (error: unknown) {
+      // Only retry on 401 and only once
+      if (error instanceof AxonError && error.status === 401 && !this.isRetrying) {
+        this.isRetrying = true;
+        try {
+          console.warn('Received 401, attempting to refresh token and retry...');
+          await this.invalidateAndRefresh();
+
+          // Retry the operation once
+          return await operation();
+        } finally {
+          this.isRetrying = false;
+        }
+      }
+
+      // For all other errors or if already retrying, throw with better message
+      throw this.enhanceError(error);
+    }
+  }
+
+  /**
+   * Invalidate current tokens and refresh them
+   * Called when we receive a 401 from the API despite having a token
+   */
+  private async invalidateAndRefresh(): Promise<void> {
+    console.info('Token invalidated by 401 response, refreshing...');
+
+    // Clear current access token
+    this.accessToken = '';
+    this.expiredAt = 0;
+
+    // Try to refresh using the refresh token
+    if (this.refreshToken) {
+      try {
+        await this.refreshAccessToken();
+        return;
+      } catch {
+        console.warn('Failed to refresh with refresh token, will try provider');
+        // If refresh fails, fall through to use provider
+      }
+    }
+
+    // If no refresh token or refresh failed, use provider
+    if (this.tokenProvider) {
+      await this.forgeRefreshToken();
+      await this.saveToStorage();
+    } else {
+      throw new Error(
+        'Authentication failed and no token provider configured. ' +
+          'Cannot recover from 401 error.'
+      );
+    }
+  }
+
+  /**
+   * Enhance error messages to be more user-friendly
+   */
+  private enhanceError(error: unknown): Error {
+    // If it's an AxonError, extract status and provide better messages
+    if (error instanceof AxonError) {
+      const status = error.status;
+      const data = error.responseData;
+
+      if (status === 401) {
+        return new Error(
+          'Authentication failed. Please check your credentials or re-authenticate.'
+        );
+      } else if (status === 404) {
+        return new Error(
+          `Resource not found: ${data?.message || data?.error?.message || 'The requested item does not exist'}`
+        );
+      } else if (status === 409) {
+        return new Error(`Conflict: ${data?.message || data?.error?.message || 'An item with this name already exists'}`);
+      } else if (status === 403) {
+        return new Error(
+          `Permission denied: ${data?.message || data?.error?.message || 'You do not have access to this resource'}`
+        );
+      } else if (status && status >= 500) {
+        return new Error(
+          `Microsoft server error (${status}): ${data?.message || data?.error?.message || 'Please try again later'}`
+        );
+      }
+    }
+
+    // If it's already an Error, return it
+    if (error instanceof Error) {
+      return error;
+    }
+
+    // Otherwise wrap it in an Error
+    return new Error(`Unknown error: ${String(error)}`);
+  }
 
   constructor(config?: AzureConfig | AzureAuth) {
     // If passed an AzureAuth instance, copy from it
@@ -229,7 +339,11 @@ export class AzureAuth {
    * Save credentials to storage
    */
   private async saveToStorage(): Promise<void> {
-    if (this.isAccessTokenOnly || this.tokenProvider) {
+    if (this.isAccessTokenOnly) {
+      return;
+    }
+
+    if (!this.refreshToken) {
       return;
     }
 
@@ -336,6 +450,7 @@ export class AzureAuth {
     if (this.tokenProvider) {
       this.storageLoadPromise = (async () => {
         await this.forgeRefreshToken();
+        await this.saveToStorage();
         console.info("Obtained tokens from token provider");
       })();
       try {
@@ -361,7 +476,7 @@ export class AzureAuth {
   /**
    * Check if token needs refresh
    */
-  private async checkToken(): Promise<void> {
+  async checkToken(): Promise<void> {
     if (this.isAccessTokenOnly) {
       return;
     }
@@ -429,7 +544,7 @@ export class AzureAuth {
     };
 
     try {
-      const res = await Axon.new({ allowInsecure: this.allowInsecure })
+      const res = await this.getAxon()
         .encodeUrl()
         .post(url, reqTokenBody);
 
@@ -467,7 +582,7 @@ export class AzureAuth {
     };
 
     try {
-      const res = await Axon.new({ allowInsecure: this.allowInsecure })
+      const res = await this.getAxon()
         .encodeUrl()
         .post(url, reqTokenBody);
 

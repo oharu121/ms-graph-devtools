@@ -1,4 +1,3 @@
-import Axon, { AxonError } from "axios-fluent";
 import dayjs from "dayjs";
 import { JSDOM } from "jsdom";
 import * as fs from "fs";
@@ -54,14 +53,13 @@ export class Outlook {
    * console.log(user.displayName, user.mail);
    */
   async getMe() {
-    try {
+    await this.auth.checkToken();
+    return this.auth.withRetry(async () => {
       const token = await this.auth.getAccessToken();
       const url = `https://graph.microsoft.com/v1.0/me`;
-      const res = await Axon.new().bearer(token).get(url);
+      const res = await this.auth.getAxon().bearer(token).get(url);
       return res.data;
-    } catch (error) {
-      this.auth.handleApiError(error as AxonError);
-    }
+    });
   }
 
   /**
@@ -84,13 +82,12 @@ export class Outlook {
    * });
    */
   async sendMail(payload: MailPayload) {
-    try {
+    await this.auth.checkToken();
+    return this.auth.withRetry(async () => {
       const token = await this.auth.getAccessToken();
       const url = "https://graph.microsoft.com/v1.0/me/sendMail";
-      return await Axon.new().bearer(token).post(url, payload);
-    } catch (error) {
-      this.auth.handleApiError(error as AxonError);
-    }
+      return await this.auth.getAxon().bearer(token).post(url, payload);
+    });
   }
 
   /**
@@ -104,7 +101,8 @@ export class Outlook {
    * const emails = await outlook.getMails('2024-01-15', 'invoice');
    */
   async getMails(date: string, subjectFilter?: string): Promise<Mail[]> {
-    try {
+    await this.auth.checkToken();
+    return this.auth.withRetry(async () => {
       const token = await this.auth.getAccessToken();
       const url = "https://graph.microsoft.com/v1.0/me/messages";
       const formattedDate = dayjs(date).format("YYYY/MM/DD");
@@ -120,7 +118,7 @@ export class Outlook {
       };
 
       const fullResult = [];
-      const res = await Axon.new()
+      const res = await this.auth.getAxon()
         .bearer(token)
         .params(params)
         .get(url);
@@ -128,7 +126,7 @@ export class Outlook {
 
       let nextLink = res.data["@odata.nextLink"] || "";
       while (nextLink) {
-        const nextRes = await Axon.new().bearer(token).get(nextLink);
+        const nextRes = await this.auth.getAxon().bearer(token).get(nextLink);
         fullResult.push(...nextRes.data.value);
         nextLink = nextRes.data["@odata.nextLink"] || "";
       }
@@ -141,9 +139,7 @@ export class Outlook {
           body: this.parseMailBody(res.body.content),
           receivedDateTime: res.receivedDateTime,
         }));
-    } catch (error) {
-      this.auth.handleApiError(error as AxonError);
-    }
+    });
   }
 
   /**

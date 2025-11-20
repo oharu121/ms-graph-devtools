@@ -1,4 +1,3 @@
-import Axon, { AxonError } from "axios-fluent";
 import { AzureAuth } from "../core/auth";
 import { AzureConfig } from "../types";
 
@@ -66,10 +65,11 @@ export class SharePoint {
    * console.log(sites); // [{ id: '...', displayName: 'Engineering Site', webUrl: '...' }]
    */
   async searchSites(query: string) {
-    try {
+    await this.auth.checkToken();
+    return this.auth.withRetry(async () => {
       const token = await this.auth.getAccessToken();
       const url = `https://graph.microsoft.com/v1.0/sites?search=${query}`;
-      const res = await Axon.new().bearer(token).get(url);
+      const res = await this.auth.getAxon().bearer(token).get(url);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return res.data.value.map((site: any) => ({
         id: site.id,
@@ -78,9 +78,7 @@ export class SharePoint {
         webUrl: site.webUrl,
         description: site.description,
       }));
-    } catch (error) {
-      this.auth.handleApiError(error as AxonError);
-    }
+    });
   }
 
   /**
@@ -94,10 +92,11 @@ export class SharePoint {
    * const site = await sharepoint.getSiteByPath('contoso.sharepoint.com', '/sites/engineering');
    */
   async getSiteByPath(hostname: string, sitePath: string) {
-    try {
+    await this.auth.checkToken();
+    return this.auth.withRetry(async () => {
       const token = await this.auth.getAccessToken();
       const url = `https://graph.microsoft.com/v1.0/sites/${hostname}:${sitePath}`;
-      const res = await Axon.new().bearer(token).get(url);
+      const res = await this.auth.getAxon().bearer(token).get(url);
       return {
         id: res.data.id,
         displayName: res.data.displayName,
@@ -105,9 +104,7 @@ export class SharePoint {
         webUrl: res.data.webUrl,
         description: res.data.description,
       };
-    } catch (error) {
-      this.auth.handleApiError(error as AxonError);
-    }
+    });
   }
 
   /**
@@ -121,7 +118,8 @@ export class SharePoint {
    * console.log(lists); // [{ id: '...', displayName: 'Tasks', ... }]
    */
   async getLists(siteId?: string) {
-    try {
+    await this.auth.checkToken();
+    return this.auth.withRetry(async () => {
       const targetSiteId = siteId || this.siteId;
       if (!targetSiteId) {
         throw new Error("Site ID is required. Provide it in constructor, setSiteId(), or as parameter.");
@@ -129,7 +127,7 @@ export class SharePoint {
 
       const token = await this.auth.getAccessToken();
       const url = `https://graph.microsoft.com/v1.0/sites/${targetSiteId}/lists`;
-      const res = await Axon.new().bearer(token).get(url);
+      const res = await this.auth.getAxon().bearer(token).get(url);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return res.data.value.map((list: any) => ({
         id: list.id,
@@ -138,9 +136,7 @@ export class SharePoint {
         description: list.description,
         webUrl: list.webUrl,
       }));
-    } catch (error) {
-      this.auth.handleApiError(error as AxonError);
-    }
+    });
   }
 
   /**
@@ -154,7 +150,8 @@ export class SharePoint {
    * const list = await sharepoint.getList('Tasks');
    */
   async getList(listIdOrName: string, siteId?: string) {
-    try {
+    await this.auth.checkToken();
+    return this.auth.withRetry(async () => {
       const targetSiteId = siteId || this.siteId;
       if (!targetSiteId) {
         throw new Error("Site ID is required. Provide it in constructor, setSiteId(), or as parameter.");
@@ -162,11 +159,9 @@ export class SharePoint {
 
       const token = await this.auth.getAccessToken();
       const url = `https://graph.microsoft.com/v1.0/sites/${targetSiteId}/lists/${listIdOrName}`;
-      const res = await Axon.new().bearer(token).get(url);
+      const res = await this.auth.getAxon().bearer(token).get(url);
       return res.data;
-    } catch (error) {
-      this.auth.handleApiError(error as AxonError);
-    }
+    });
   }
 
   /**
@@ -195,7 +190,8 @@ export class SharePoint {
     },
     siteId?: string
   ) {
-    try {
+    await this.auth.checkToken();
+    return this.auth.withRetry(async () => {
       const targetSiteId = siteId || this.siteId;
       if (!targetSiteId) {
         throw new Error("Site ID is required. Provide it in constructor, setSiteId(), or as parameter.");
@@ -211,15 +207,13 @@ export class SharePoint {
       if (options?.top) params.$top = options.top;
       if (options?.expand) params.$expand = options.expand;
 
-      const res = await Axon.new()
+      const res = await this.auth.getAxon()
         .bearer(token)
         .params(params)
         .get(url);
 
       return res.data.value;
-    } catch (error) {
-      this.auth.handleApiError(error as AxonError);
-    }
+    });
   }
 
   /**
@@ -240,7 +234,8 @@ export class SharePoint {
     expand?: string,
     siteId?: string
   ) {
-    try {
+    await this.auth.checkToken();
+    return this.auth.withRetry(async () => {
       const targetSiteId = siteId || this.siteId;
       if (!targetSiteId) {
         throw new Error("Site ID is required. Provide it in constructor, setSiteId(), or as parameter.");
@@ -253,15 +248,13 @@ export class SharePoint {
       const params: any = {};
       if (expand) params.$expand = expand;
 
-      const res = await Axon.new()
+      const res = await this.auth.getAxon()
         .bearer(token)
         .params(params)
         .get(url);
 
       return res.data;
-    } catch (error) {
-      this.auth.handleApiError(error as AxonError);
-    }
+    });
   }
 
   /**
@@ -285,7 +278,8 @@ export class SharePoint {
     fields: Record<string, any>,
     siteId?: string
   ) {
-    try {
+    await this.auth.checkToken();
+    return this.auth.withRetry(async () => {
       const targetSiteId = siteId || this.siteId;
       if (!targetSiteId) {
         throw new Error("Site ID is required. Provide it in constructor, setSiteId(), or as parameter.");
@@ -296,11 +290,9 @@ export class SharePoint {
 
       const payload = { fields };
 
-      const res = await Axon.new().bearer(token).post(url, payload);
+      const res = await this.auth.getAxon().bearer(token).post(url, payload);
       return res.data;
-    } catch (error) {
-      this.auth.handleApiError(error as AxonError);
-    }
+    });
   }
 
   /**
@@ -324,7 +316,8 @@ export class SharePoint {
     fields: Record<string, any>,
     siteId?: string
   ) {
-    try {
+    await this.auth.checkToken();
+    return this.auth.withRetry(async () => {
       const targetSiteId = siteId || this.siteId;
       if (!targetSiteId) {
         throw new Error("Site ID is required. Provide it in constructor, setSiteId(), or as parameter.");
@@ -335,11 +328,9 @@ export class SharePoint {
 
       const payload = { fields };
 
-      const res = await Axon.new().bearer(token).patch(url, payload);
+      const res = await this.auth.getAxon().bearer(token).patch(url, payload);
       return res.data;
-    } catch (error) {
-      this.auth.handleApiError(error as AxonError);
-    }
+    });
   }
 
   /**
@@ -353,7 +344,8 @@ export class SharePoint {
    * await sharepoint.deleteListItem('Tasks', '123');
    */
   async deleteListItem(listId: string, itemId: string, siteId?: string) {
-    try {
+    await this.auth.checkToken();
+    return this.auth.withRetry(async () => {
       const targetSiteId = siteId || this.siteId;
       if (!targetSiteId) {
         throw new Error("Site ID is required. Provide it in constructor, setSiteId(), or as parameter.");
@@ -361,10 +353,8 @@ export class SharePoint {
 
       const token = await this.auth.getAccessToken();
       const url = `https://graph.microsoft.com/v1.0/sites/${targetSiteId}/lists/${listId}/items/${itemId}`;
-      await Axon.new().bearer(token).delete(url);
-    } catch (error) {
-      this.auth.handleApiError(error as AxonError);
-    }
+      await this.auth.getAxon().bearer(token).delete(url);
+    });
   }
 
   /**
@@ -382,13 +372,12 @@ export class SharePoint {
     itemIds: string[],
     siteId?: string
   ) {
-    try {
+    await this.auth.checkToken();
+    return this.auth.withRetry(async () => {
       await Promise.all(
         itemIds.map((itemId) => this.deleteListItem(listId, itemId, siteId))
       );
-    } catch (error) {
-      this.auth.handleApiError(error as AxonError);
-    }
+    });
   }
 
   /**
@@ -418,7 +407,8 @@ export class SharePoint {
     deleteAfterProcess: boolean = false,
     siteId?: string
   ): Promise<T[]> {
-    try {
+    await this.auth.checkToken();
+    return this.auth.withRetry(async () => {
       const items = await this.getListItems(
         listId,
         {
@@ -442,10 +432,7 @@ export class SharePoint {
       }
 
       return results;
-    } catch (error) {
-      this.auth.handleApiError(error as AxonError);
-      return [];
-    }
+    });
   }
 
   /**
@@ -466,7 +453,8 @@ export class SharePoint {
     filter?: string,
     siteId?: string
   ) {
-    try {
+    await this.auth.checkToken();
+    return this.auth.withRetry(async () => {
       const items = await this.getListItems(
         listId,
         {
@@ -479,9 +467,7 @@ export class SharePoint {
       );
 
       return items && items.length > 0 ? items[0] : undefined;
-    } catch (error) {
-      this.auth.handleApiError(error as AxonError);
-    }
+    });
   }
 
   /**
@@ -496,7 +482,8 @@ export class SharePoint {
    * console.log(columns); // [{ name: 'Title', displayName: 'Title', ... }]
    */
   async getListColumns(listId: string, siteId?: string) {
-    try {
+    await this.auth.checkToken();
+    return this.auth.withRetry(async () => {
       const targetSiteId = siteId || this.siteId;
       if (!targetSiteId) {
         throw new Error("Site ID is required. Provide it in constructor, setSiteId(), or as parameter.");
@@ -504,7 +491,7 @@ export class SharePoint {
 
       const token = await this.auth.getAccessToken();
       const url = `https://graph.microsoft.com/v1.0/sites/${targetSiteId}/lists/${listId}/columns`;
-      const res = await Axon.new().bearer(token).get(url);
+      const res = await this.auth.getAxon().bearer(token).get(url);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return res.data.value.map((column: any) => ({
         id: column.id,
@@ -515,8 +502,6 @@ export class SharePoint {
         hidden: column.hidden,
         readOnly: column.readOnly,
       }));
-    } catch (error) {
-      this.auth.handleApiError(error as AxonError);
-    }
+    });
   }
 }

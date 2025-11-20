@@ -46,7 +46,9 @@ describe("Outlook Service", () => {
     });
 
     vi.spyOn(mockAuth, "getAccessToken");
-    vi.spyOn(mockAuth, "handleApiError");
+    vi.spyOn(mockAuth, "checkToken");
+    vi.spyOn(mockAuth, "withRetry").mockImplementation(async (fn) => await fn());
+    vi.spyOn(mockAuth, "getAxon").mockImplementation(() => Axon.new());
   });
 
   describe("Constructor", () => {
@@ -102,15 +104,12 @@ describe("Outlook Service", () => {
 
     it("should handle API errors", async () => {
       const mockError = new Error("Unauthorized");
-      const mockAxonInstance = {
-        bearer: vi.fn().mockReturnThis(),
-        get: vi.fn().mockRejectedValue(mockError),
-      };
 
-      (Axon.new as any).mockReturnValue(mockAxonInstance);
+      // Mock withRetry to throw the error
+      vi.spyOn(mockAuth, "withRetry").mockRejectedValue(mockError);
 
       await expect(outlook.getMe()).rejects.toThrow("Unauthorized");
-      expect(mockAuth.handleApiError).toHaveBeenCalledWith(mockError);
+      expect(mockAuth.withRetry).toHaveBeenCalled();
     });
   });
 

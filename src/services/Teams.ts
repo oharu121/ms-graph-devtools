@@ -1,4 +1,3 @@
-import Axon, { AxonError } from "axios-fluent";
 import { AzureAuth } from "../core/auth";
 import { AzureConfig, Tag } from "../types";
 
@@ -36,19 +35,18 @@ export class Teams {
    * console.log(teams); // [{ id: '...', displayName: 'Engineering Team' }, ...]
    */
   async getTeams() {
-    try {
+    await this.auth.checkToken();
+    return this.auth.withRetry(async () => {
       const token = await this.auth.getAccessToken();
       const url = "https://graph.microsoft.com/v1.0/me/joinedTeams";
-      const res = await Axon.new().bearer(token).get(url);
+      const res = await this.auth.getAxon().bearer(token).get(url);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return res.data.value.map((team: any) => ({
         id: team.id,
         displayName: team.displayName,
         description: team.description,
       }));
-    } catch (error) {
-      this.auth.handleApiError(error as AxonError);
-    }
+    });
   }
 
   /**
@@ -62,10 +60,11 @@ export class Teams {
    * console.log(channels); // [{ id: '...', displayName: 'General' }, ...]
    */
   async getChannels(teamId: string) {
-    try {
+    await this.auth.checkToken();
+    return this.auth.withRetry(async () => {
       const token = await this.auth.getAccessToken();
       const url = `https://graph.microsoft.com/v1.0/teams/${teamId}/channels`;
-      const res = await Axon.new().bearer(token).get(url);
+      const res = await this.auth.getAxon().bearer(token).get(url);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return res.data.value.map((channel: any) => ({
         id: channel.id,
@@ -73,9 +72,7 @@ export class Teams {
         description: channel.description,
         membershipType: channel.membershipType,
       }));
-    } catch (error) {
-      this.auth.handleApiError(error as AxonError);
-    }
+    });
   }
 
   /**
@@ -89,10 +86,11 @@ export class Teams {
    * console.log(tags); // [{ id: '...', displayName: 'Engineering', memberCount: 5 }, ...]
    */
   async getTags(teamId: string) {
-    try {
+    await this.auth.checkToken();
+    return this.auth.withRetry(async () => {
       const token = await this.auth.getAccessToken();
       const url = `https://graph.microsoft.com/v1.0/teams/${teamId}/tags`;
-      const res = await Axon.new().bearer(token).get(url);
+      const res = await this.auth.getAxon().bearer(token).get(url);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return res.data.value.map((tag: any) => ({
         id: tag.id,
@@ -100,9 +98,7 @@ export class Teams {
         description: tag.description,
         memberCount: tag.memberCount,
       }));
-    } catch (error) {
-      this.auth.handleApiError(error as AxonError);
-    }
+    });
   }
 
   /**
@@ -129,7 +125,8 @@ export class Teams {
     card: any,
     tags?: Tag[]
   ) {
-    try {
+    await this.auth.checkToken();
+    return this.auth.withRetry(async () => {
       const token = await this.auth.getAccessToken();
       const tagText = tags ? this.createMentionTags(tags).join("<br>") : "";
 
@@ -156,12 +153,9 @@ export class Teams {
       };
 
       const url = `https://graph.microsoft.com/v1.0/teams/${teamId}/channels/${channelId}/messages`;
-      const res = await Axon.new().bearer(token).post(url, payload);
+      const res = await this.auth.getAxon().bearer(token).post(url, payload);
       return res.data;
-    } catch (error) {
-      console.error(JSON.stringify(error, null, 2));
-      this.auth.handleApiError(error as AxonError);
-    }
+    });
   }
 
   /**
