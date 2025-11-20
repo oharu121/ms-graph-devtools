@@ -1,6 +1,6 @@
 {
   "name": "ms-graph-devtools",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "type": "module",
   "description": "TypeScript utility for Microsoft Graph API automation - Outlook, Teams, SharePoint, and Calendar with fluent builders and automatic token management",
   "main": "index.js",
