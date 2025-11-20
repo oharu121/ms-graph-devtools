@@ -429,6 +429,14 @@ export class AzureAuth {
       return;
     }
 
+    // Check again after waiting - another concurrent call might have started loading
+    if (this.storageLoadPromise) {
+      await this.storageLoadPromise;
+      if (this.refreshToken) {
+        return;
+      }
+    }
+
     // ALWAYS try loading from storage first (regardless of tokenProvider)
     this.storageLoadPromise = (async () => {
       await this.loadFromStorage();
@@ -441,6 +449,19 @@ export class AzureAuth {
       }
     } finally {
       this.storageLoadPromise = null;
+    }
+
+    // Check one more time before starting provider - storage might have been loaded by concurrent call
+    if (this.refreshToken) {
+      return;
+    }
+
+    // Check if another call already started the provider
+    if (this.storageLoadPromise) {
+      await this.storageLoadPromise;
+      if (this.refreshToken) {
+        return;
+      }
     }
 
     // Only use tokenProvider if storage didn't have tokens

@@ -230,6 +230,9 @@ describe("AzureAuth - Token Storage Race Condition Fix", () => {
         tokenProvider: mockProvider,
       });
 
+      // Mock loadFromStorage to return empty (so it falls through to provider)
+      vi.spyOn(auth as any, "loadFromStorage").mockResolvedValue(false);
+
       // Make 5 concurrent calls
       const promises = Array(5)
         .fill(null)
@@ -237,13 +240,13 @@ describe("AzureAuth - Token Storage Race Condition Fix", () => {
 
       await Promise.all(promises);
 
-      // Provider should be called only once
+      // Provider should be called only once (after storage check fails)
       expect(providerCallCount).toBe(1);
       expect(mockProvider).toHaveBeenCalledTimes(1);
       expect((auth as any).refreshToken).toBe("mock-refresh-token");
     });
 
-    it("should skip storage load when tokenProvider is configured", async () => {
+    it("should check storage first, then use tokenProvider if storage empty", async () => {
       const mockProvider = vi.fn(async (_callback: string) => "auth-code");
 
       const auth = new AzureAuth({
@@ -257,8 +260,9 @@ describe("AzureAuth - Token Storage Race Condition Fix", () => {
 
       await (auth as any).ensureRefreshToken();
 
-      // Storage should not be accessed when tokenProvider is configured
-      expect(loadSpy).not.toHaveBeenCalled();
+      // Storage SHOULD be checked first (new behavior)
+      expect(loadSpy).toHaveBeenCalledTimes(1);
+      // Then provider is called because storage was empty
       expect(mockProvider).toHaveBeenCalledTimes(1);
 
       loadSpy.mockRestore();
@@ -308,8 +312,8 @@ describe("AzureAuth - Token Storage Race Condition Fix", () => {
 
       await Promise.all(promises);
 
-      // Provider should be used (storage skipped when provider exists)
-      expect(loadSpy).not.toHaveBeenCalled();
+      // Storage should be checked first (new behavior), then provider used
+      expect(loadSpy).toHaveBeenCalledTimes(1);
       expect(mockProvider).toHaveBeenCalledTimes(1);
       expect((auth as any).refreshToken).toBe("mock-refresh-token");
 
@@ -353,8 +357,14 @@ describe("AzureAuth - Token Storage Race Condition Fix", () => {
         tokenProvider: mockProvider,
       });
 
+      // Mock loadFromStorage to simulate empty storage
+      vi.spyOn(auth as any, "loadFromStorage").mockResolvedValue(false);
+
       // Start first call
       const promise1 = (auth as any).ensureRefreshToken();
+
+      // Give it a moment to start the storage load
+      await new Promise((resolve) => setTimeout(resolve, 10));
       const firstPromise = (auth as any).storageLoadPromise;
 
       // Start second call while first is in flight
@@ -366,7 +376,7 @@ describe("AzureAuth - Token Storage Race Condition Fix", () => {
 
       await Promise.all([promise1, promise2]);
 
-      // Provider should only be called once
+      // Provider should only be called once (after storage check)
       expect(mockProvider).toHaveBeenCalledTimes(1);
     });
   });
