@@ -5,6 +5,78 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0]
+
+### Added
+- **AWS SDK-Style Global Instance API**
+  - Added lazy-loaded service getters: `Azure.outlook`, `Azure.teams`, `Azure.calendar`, `Azure.sharePoint`
+  - Services are now accessible directly after calling `Azure.config()` - no manual instantiation needed
+  - Singleton pattern: same instance returned on multiple accesses
+  - Lazy initialization: services only created when first accessed
+  - `Azure.reset()` now clears all service instances for clean state
+
+### Changed
+- **⚠️ API Improvement: Simplified service access pattern**
+  - **Before**: `Azure.config({...}); const outlook = new Outlook(); await outlook.sendMail({...});`
+  - **After**: `Azure.config({...}); await Azure.outlook.sendMail({...});`
+  - No more manual service instantiation required
+  - Global config is automatically applied to all services
+  - Calling `Azure.config()` resets all service instances to pick up new configuration
+  - Old pattern (`new Outlook()`) still works for advanced use cases
+
+### Documentation
+- Complete README rewrite to showcase new API pattern
+- Updated all examples to use `Azure.service` syntax
+- Added comprehensive vitest test suite for new API (`tests/azure-api.test.ts`)
+- Updated Three-Tier User System examples
+- Updated Service Usage Patterns section
+- Clarified FAQ and troubleshooting for new API
+
+### Migration Guide
+
+**Old Pattern (Still Supported):**
+```typescript
+import { Outlook, Teams } from 'ms-graph-devtools';
+
+const outlook = new Outlook({
+  clientId: "...",
+  clientSecret: "...",
+  tenantId: "...",
+  refreshToken: "..."
+});
+
+await outlook.sendMail({...});
+```
+
+**New Pattern (Recommended):**
+```typescript
+import Azure from 'ms-graph-devtools';
+
+// Configure once
+Azure.config({
+  clientId: "...",
+  clientSecret: "...",
+  tenantId: "...",
+  refreshToken: "..."
+});
+
+// Export for use across your app
+export default Azure;
+
+// Use services directly - no instantiation needed!
+await Azure.outlook.sendMail({...});
+await Azure.teams.postMessage({...});
+await Azure.calendar.getCalendars();
+await Azure.sharePoint.getLists();
+```
+
+**Benefits:**
+- ✅ Configure once, use everywhere
+- ✅ No redundant `init()` or instantiation
+- ✅ Clean, AWS SDK-like API
+- ✅ Better discoverability (IDE autocomplete shows all services)
+- ✅ Still tree-shakable (unused services won't be bundled)
+
 ## [1.1.1]
 
 ### Changed

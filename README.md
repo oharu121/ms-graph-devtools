@@ -11,13 +11,14 @@ A TypeScript utility for Microsoft Graph API operations with automatic token man
 
 ## ✨ Features
 
-- ✅ **Singleton pattern** - One instance shared across your entire application
+- ✅ **Global instance pattern** - Configure once, export, use everywhere in your app
+- ✅ **AWS SDK-style API** - Familiar `Azure.service` pattern (e.g., `Azure.outlook.sendMail()`)
 - ✅ **Automatic token refresh** - Handles token expiration transparently
-- ✅ **Multiple token sources** - Direct config, storage, or custom provider
+- ✅ **Multiple auth modes** - Access token, refresh token, or custom token provider
 - ✅ **Cross-platform storage** - Works on Windows, Mac, and Linux using XDG standards
-- ✅ **Idempotent initialization** - Safe to call `init()` multiple times
 - ✅ **TypeScript support** - Full type safety and autocomplete
-- ✅ **Method chaining** - Clean, fluent API
+- ✅ **Fluent builders** - Clean, chainable APIs for emails and Teams cards
+- ✅ **Zero config imports** - Import configured instance, no setup needed at call site
 
 ## Major Achievement: Three-Tier User System
 
@@ -30,7 +31,8 @@ Successfully designed and implemented a progressive complexity model for Azure a
 **API:**
 
 ```typescript
-Azure.setAccessToken("eyJ0eX...").getMe();
+Azure.config({ accessToken: "eyJ0eX..." });
+await Azure.outlook.getMe();
 ```
 
 **Key Features:**
@@ -54,12 +56,13 @@ Azure.setAccessToken("eyJ0eX...").getMe();
 **API:**
 
 ```typescript
-Azure.init({
+Azure.config({
   refreshToken: "xxx",
   clientId: "...",
   clientSecret: "...",
   tenantId: "...",
 });
+await Azure.outlook.sendMail({...});
 ```
 
 **Key Features:**
@@ -81,12 +84,13 @@ Azure.init({
 **API:**
 
 ```typescript
-Azure.init({
+Azure.config({
   clientId: "...",
   clientSecret: "...",
   tenantId: "...",
-  tokenProvider: async () => await vault.get("token"),
+  tokenProvider: async (callback) => await getAuthCode(callback),
 });
+await Azure.teams.postMessage({...});
 ```
 
 **Key Features:**
@@ -102,76 +106,121 @@ Azure.init({
 ### Installation
 
 ```bash
-npm install your-package-name
+npm install ms-graph-devtools
 ```
 
-### Basic Usage
+### Best Practice: Global Instance Pattern (Recommended)
+
+**Create a single config file and export the configured instance:**
 
 ```typescript
+// config/azure.ts (or src/lib/azure.ts, etc.)
 import Azure from 'ms-graph-devtools';
 
-// Simple usage - loads token from storage
-await Azure.init().getMe();
+Azure.config({
+  clientId: process.env.AZURE_CLIENT_ID,
+  clientSecret: process.env.AZURE_CLIENT_SECRET,
+  tenantId: process.env.AZURE_TENANT_ID,
+  tokenProvider: async (callback) => {
+    return await Playwright.getAzureCode(callback);
+  },
+});
 
-// Provide token directly
-await Azure.init({ refreshToken: 'your-token' }).sendMail({...});
-
-// Load from storage
-await Azure.init().getCalendars();
+// Export configured instance - this is your single source of truth
+export default Azure;
 ```
+
+**Then import and use everywhere in your app:**
+
+```typescript
+// anywhere in your codebase
+import Azure from './config/azure';
+
+// Use services directly - already configured!
+await Azure.outlook.sendMail({...});
+await Azure.teams.postMessage({...});
+await Azure.calendar.getCalendars();
+await Azure.sharePoint.getLists();
+```
+
+**Why this pattern?**
+- ✅ Configure once, use everywhere
+- ✅ Single source of truth for credentials
+- ✅ No config duplication across files
+- ✅ Easy to test (mock one import)
+- ✅ Consistent auth across your entire app
+- ✅ Clean imports - no config needed at call site
 
 ## 📖 API Reference
 
-### `Azure.init(config?): Azure`
+### `Azure.config(config): void`
 
-Initialize the Azure singleton instance. This method is **idempotent** - calling it multiple times will only apply the first configuration.
+Set global configuration for all Azure services. Call once at app startup.
 
 **Parameters:**
 
 ```typescript
 interface AzureConfig {
-  refreshToken?: string; // Direct token
-  tokenProvider?: () => Promise<string> | string; // Custom token provider
-  clientId?: string; // Azure app client ID
-  clientSecret?: string; // Azure app client secret
-  tenantId?: string; // Azure tenant ID
+  // Authentication options (choose one):
+  accessToken?: string;              // Light mode: temporary token (~1 hour)
+  refreshToken?: string;             // Medium mode: 90-day auto-renewal
+  tokenProvider?: (callback: string) => Promise<string> | string; // Super mode: infinite renewal
+
+  // Required credentials:
+  clientId?: string;                 // Azure app client ID
+  clientSecret?: string;             // Azure app client secret
+  tenantId?: string;                 // Azure tenant ID
+
+  // Optional:
+  scopes?: string[];                 // Custom OAuth scopes
+  allowInsecure?: boolean;           // Allow insecure SSL (dev only)
 }
 ```
-
-**Returns:** `Azure` instance for method chaining
 
 **Examples:**
 
 ```typescript
-// Load from storage (most common in production)
-const azure = Azure.init();
+// Medium User: Refresh token (90-day renewal)
+Azure.config({
+  clientId: process.env.AZURE_CLIENT_ID,
+  clientSecret: process.env.AZURE_CLIENT_SECRET,
+  tenantId: process.env.AZURE_TENANT_ID,
+  refreshToken: process.env.AZURE_REFRESH_TOKEN,
+});
 
-// Provide token directly
-const azure = Azure.init({ refreshToken: "xxx" });
-
-// Custom token provider
-const azure = Azure.init({
-  tokenProvider: async () => {
-    return await mySecureVault.get("azure-token");
+// Super User: Token provider (infinite renewal)
+Azure.config({
+  clientId: process.env.AZURE_CLIENT_ID,
+  clientSecret: process.env.AZURE_CLIENT_SECRET,
+  tenantId: process.env.AZURE_TENANT_ID,
+  tokenProvider: async (callback) => {
+    // Your custom auth logic (e.g., Playwright, browser automation)
+    return await getAuthorizationCode(callback);
   },
 });
 
-// Full configuration
-const azure = Azure.init({
-  refreshToken: "xxx",
-  clientId: "your-client-id",
-  clientSecret: "your-client-secret",
-  tenantId: "your-tenant-id",
+// Light User: Access token only (temporary)
+Azure.config({
+  accessToken: "eyJ0eX...", // Expires in ~1 hour
 });
 ```
 
+### Service Getters
+
+After calling `Azure.config()`, access services directly:
+
+- **`Azure.outlook`** - Email operations
+- **`Azure.teams`** - Teams messaging and adaptive cards
+- **`Azure.calendar`** - Calendar and holidays
+- **`Azure.sharePoint`** - SharePoint lists and sites
+
 ### `Azure.reset(): void`
 
-Reset the singleton instance. Useful for testing or when you need to reinitialize with different credentials.
+Reset global configuration and clear all service instances. Useful for testing or switching accounts.
 
 ```typescript
 Azure.reset();
-Azure.init({ refreshToken: "new-token" });
+Azure.config({ refreshToken: "new-token" });
 ```
 
 ### `Azure.listStoredCredentials(): Promise<Array>`
@@ -243,34 +292,43 @@ Tokens are automatically saved to platform-specific locations with **multi-tenan
 
 ## 📋 Usage Examples
 
-### Example 1: Production Usage (Storage)
+### Example 1: Global Configuration Pattern (Recommended)
 
 ```typescript
+// config/azure.ts - Configure once, use everywhere
 import Azure from 'ms-graph-devtools';
 
-// First time setup - provide token
-Azure.init({ refreshToken: 'your-token' });
-// Token is saved to storage
+Azure.config({
+  clientId: process.env.AZURE_CLIENT_ID,
+  clientSecret: process.env.AZURE_CLIENT_SECRET,
+  tenantId: process.env.AZURE_TENANT_ID,
+  refreshToken: process.env.AZURE_REFRESH_TOKEN,
+});
 
-// All subsequent runs - just works
-await Azure.init().getMe();
-await Azure.init().sendMail({...});
+export default Azure;
+```
+
+```typescript
+// anywhere in your app
+import Azure from './config/azure';
+
+await Azure.outlook.sendMail({...});
+await Azure.teams.postMessage({...});
 ```
 
 ### Example 2: Scheduled Automation
 
 ```typescript
 // scheduled-task.ts
-import Azure from "ms-graph-devtools";
+import Azure from './config/azure'; // Pre-configured instance
 
 async function dailyReport() {
-  // Loads token from storage automatically
-  const emails = await Azure.init().getMails(
+  const emails = await Azure.outlook.getMails(
     new Date().toISOString(),
     "Invoice"
   );
 
-  await Azure.init().sendMail({
+  await Azure.outlook.sendMail({
     message: {
       subject: "Daily Report",
       body: {
@@ -295,63 +353,63 @@ dailyReport();
 0 9 * * * cd /path/to/project && node scheduled-task.js
 ```
 
-### Example 3: Custom Token Provider
+### Example 3: Token Provider with Playwright
 
 ```typescript
+// config/azure.ts
 import Azure from "ms-graph-devtools";
-import { SecretVault } from "my-vault";
+import Playwright from "./playwright-helper";
 
-const vault = new SecretVault();
-
-await Azure.init({
-  tokenProvider: async () => {
-    return await vault.getSecret("azure-refresh-token");
+Azure.config({
+  clientId: process.env.AZURE_CLIENT_ID,
+  clientSecret: process.env.AZURE_CLIENT_SECRET,
+  tenantId: process.env.AZURE_TENANT_ID,
+  tokenProvider: async (callback) => {
+    // Playwright automates browser to get auth code
+    return await Playwright.getAzureCode(callback);
   },
-}).getCalendars();
-```
+});
 
-### Example 4: Multiple Scripts (Singleton)
+export default Azure;
+```
 
 ```typescript
-// script1.js
-import Azure from 'ms-graph-devtools';
-Azure.init({ refreshToken: 'xxx' });
-await Azure.init().getMe();
+// anywhere in your app
+import Azure from './config/azure';
 
-// script2.js (different file)
-import Azure from 'ms-graph-devtools';
-// Same instance! No need to provide token again
-await Azure.init().sendMail({...});
+// Just works - tokenProvider handles auth automatically
+await Azure.outlook.getMe();
+await Azure.calendar.getCalendars();
 ```
 
-### Example 5: Multi-Tenant Usage
+### Example 4: Multi-Tenant Usage
 
 ```typescript
 import Azure from "ms-graph-devtools";
 
 // Company A
-Azure.init({
+Azure.config({
   tenantId: "company-a-tenant-id",
   clientId: "app-1-client-id",
   clientSecret: process.env.COMPANY_A_SECRET,
   refreshToken: "company-a-token",
 });
-await Azure.init().getMe();
+await Azure.outlook.getMe();
 // Saved to: tokens.company-a-tenant-id.app-1-client-id.json
 
 // Switch to Company B (reset first)
 Azure.reset();
-Azure.init({
+Azure.config({
   tenantId: "company-b-tenant-id",
   clientId: "app-2-client-id",
   clientSecret: process.env.COMPANY_B_SECRET,
   refreshToken: "company-b-token",
 });
-await Azure.init().getMe();
+await Azure.teams.getTeams();
 // Saved to: tokens.company-b-tenant-id.app-2-client-id.json
 
 // Both token files are preserved!
-// You can switch between them by calling reset() and init()
+// Switch between them by calling reset() and config()
 ```
 
 ### Example 5: CI/CD Environment
@@ -361,14 +419,15 @@ await Azure.init().getMe();
 import Azure from 'ms-graph-devtools';
 
 // Load credentials from GitHub Secrets or environment
-const outlook = new Outlook({
+Azure.config({
   clientId: process.env.AZURE_CLIENT_ID,
   clientSecret: process.env.AZURE_CLIENT_SECRET,
   tenantId: process.env.AZURE_TENANT_ID,
   refreshToken: process.env.AZURE_REFRESH_TOKEN,
 });
 
-await outlook.sendMail({...});
+await Azure.outlook.sendMail({...});
+await Azure.teams.postMessage({...});
 ```
 
 ```yaml
@@ -384,25 +443,28 @@ steps:
 
 ## 📚 Service Classes
 
-This library provides specialized service classes for different Microsoft Graph APIs. Each service can be used independently or through the main Azure class.
+This library provides specialized service classes for different Microsoft Graph APIs.
+
+**Two usage patterns:**
+
+1. **Global instance (Recommended)**: `Azure.outlook`, `Azure.teams`, etc. after calling `Azure.config()`
+2. **Direct instantiation**: `new Outlook()` for advanced use cases (multiple configs, dependency injection)
 
 ### 🔷 Outlook Service
 
 Email operations with fluent builder pattern.
 
 ```typescript
-import { Outlook } from "smart-azure";
+import Azure from "ms-graph-devtools";
 
-const outlook = new Outlook();
-
-// Get current user
-const user = await outlook.getMe();
+// Pattern 1: Via Azure global instance (recommended)
+const user = await Azure.outlook.getMe();
 
 // Get emails
-const emails = await outlook.getMails("2024-01-15", "invoice");
+const emails = await Azure.outlook.getMails("2024-01-15", "invoice");
 
 // Send email with fluent builder
-await outlook
+await Azure.outlook
   .compose()
   .subject("Meeting Reminder")
   .body("Don't forget our meeting tomorrow!", "Text")
@@ -412,13 +474,18 @@ await outlook
   .send();
 
 // With attachments
-await outlook
+await Azure.outlook
   .compose()
   .subject("Monthly Report")
   .body("<h1>Report</h1>", "HTML")
   .to(["boss@example.com"])
   .attachments(["./report.pdf", "./charts.xlsx"])
   .send();
+
+// Pattern 2: Direct instantiation (advanced)
+import { Outlook } from "ms-graph-devtools";
+const outlook = new Outlook({ refreshToken: "..." });
+await outlook.sendMail({...});
 ```
 
 **Available Methods:**
@@ -447,24 +514,22 @@ await outlook
 Teams messaging, adaptive cards, and channel management.
 
 ```typescript
-import { Teams } from "smart-azure";
-
-const teams = new Teams();
+import Azure from "ms-graph-devtools";
 
 // Get user's teams
-const myTeams = await teams.getTeams();
+const myTeams = await Azure.teams.getTeams();
 // [{ id: '...', displayName: 'Engineering Team', description: '...' }]
 
 // Get channels for a team
-const channels = await teams.getChannels(myTeams[0].id);
+const channels = await Azure.teams.getChannels(myTeams[0].id);
 // [{ id: '...', displayName: 'General', membershipType: 'standard' }]
 
 // Get tags for mentions
-const tags = await teams.getTags(myTeams[0].id);
+const tags = await Azure.teams.getTags(myTeams[0].id);
 // [{ id: '...', displayName: 'Backend Team', memberCount: 5 }]
 
 // Send adaptive card with builder
-await teams
+await Azure.teams
   .compose()
   .team("team-id")
   .channel("channel-id")
@@ -518,23 +583,21 @@ await teams
 SharePoint list operations and site management.
 
 ```typescript
-import { SharePoint } from "smart-azure";
-
-const sharepoint = new SharePoint();
+import Azure from "ms-graph-devtools";
 
 // Search for sites
-const sites = await sharepoint.searchSites("Engineering");
-sharepoint.setSiteId(sites[0].id);
+const sites = await Azure.sharePoint.searchSites("Engineering");
+Azure.sharePoint.setSiteId(sites[0].id);
 
 // Get all lists in site
-const lists = await sharepoint.getLists();
+const lists = await Azure.sharePoint.getLists();
 // [{ id: '...', displayName: 'Tasks', webUrl: '...' }]
 
 // Get list columns
-const columns = await sharepoint.getListColumns("Tasks");
+const columns = await Azure.sharePoint.getListColumns("Tasks");
 
 // Create list item
-await sharepoint.createListItem("Tasks", {
+await Azure.sharePoint.createListItem("Tasks", {
   Title: "New Task",
   Status: "Active",
   Priority: "High",
@@ -542,7 +605,7 @@ await sharepoint.createListItem("Tasks", {
 });
 
 // Query items with filtering
-const items = await sharepoint.getListItems("Tasks", {
+const items = await Azure.sharePoint.getListItems("Tasks", {
   filter: "fields/Status eq 'Active'",
   orderby: "createdDateTime desc",
   top: 10,
@@ -550,15 +613,15 @@ const items = await sharepoint.getListItems("Tasks", {
 });
 
 // Update item
-await sharepoint.updateListItem("Tasks", "item-id", {
+await Azure.sharePoint.updateListItem("Tasks", "item-id", {
   Status: "Completed",
 });
 
 // Delete item
-await sharepoint.deleteListItem("Tasks", "item-id");
+await Azure.sharePoint.deleteListItem("Tasks", "item-id");
 
 // Advanced: Query and process (task queue pattern)
-const tasks = await sharepoint.queryAndProcess(
+const tasks = await Azure.sharePoint.queryAndProcess(
   "TaskQueue",
   "fields/taskName eq 'send-notification'",
   (item) => ({
@@ -570,7 +633,7 @@ const tasks = await sharepoint.queryAndProcess(
 );
 
 // Get latest item
-const latest = await sharepoint.getLatestItem("Tasks");
+const latest = await Azure.sharePoint.getLatestItem("Tasks");
 ```
 
 **Available Methods:**
@@ -597,19 +660,17 @@ const latest = await sharepoint.getLatestItem("Tasks");
 Calendar and holiday management.
 
 ```typescript
-import { Calendar } from "smart-azure";
-
-const calendar = new Calendar();
+import Azure from "ms-graph-devtools";
 
 // Get all calendars
-const calendars = await calendar.getCalendars();
+const calendars = await Azure.calendar.getCalendars();
 
 // Get holidays
-const indiaHolidays = await calendar.getIndiaHolidays(
+const indiaHolidays = await Azure.calendar.getIndiaHolidays(
   "2024-01-01",
   "2024-12-31"
 );
-const japanHolidays = await calendar.getJapanHolidays(
+const japanHolidays = await Azure.calendar.getJapanHolidays(
   "2024-01-01",
   "2024-12-31"
 );
@@ -625,24 +686,52 @@ const japanHolidays = await calendar.getJapanHolidays(
 
 ## 🎯 Service Usage Patterns
 
-### Pattern 1: Direct Service Usage
+### Pattern 1: Global Instance (Recommended)
 
 ```typescript
-import { Outlook, Teams, SharePoint } from 'smart-azure';
+// config/azure.ts
+import Azure from 'ms-graph-devtools';
 
-const outlook = new Outlook();
-const teams = new Teams();
-const sharepoint = new SharePoint();
+Azure.config({
+  clientId: process.env.AZURE_CLIENT_ID,
+  clientSecret: process.env.AZURE_CLIENT_SECRET,
+  tenantId: process.env.AZURE_TENANT_ID,
+  refreshToken: process.env.AZURE_REFRESH_TOKEN,
+});
 
-await outlook.compose().subject('Test').to(['user@example.com']).send();
-await teams.compose().team('id').channel('id').card({...}).send();
-await sharepoint.createListItem('Tasks', { Title: 'New Task' });
+export default Azure;
 ```
 
-### Pattern 2: Shared Authentication
+```typescript
+// anywhere in your app
+import Azure from './config/azure';
+
+await Azure.outlook.compose().subject('Test').to(['user@example.com']).send();
+await Azure.teams.compose().team('id').channel('id').card({...}).send();
+await Azure.sharePoint.createListItem('Tasks', { Title: 'New Task' });
+```
+
+### Pattern 2: Direct Service Instantiation (Advanced)
+
+For cases where you need multiple configurations or dependency injection:
 
 ```typescript
-import { AzureAuth, Outlook, Teams } from "smart-azure";
+import { Outlook, Teams } from "ms-graph-devtools";
+
+const outlook = new Outlook({
+  clientId: process.env.AZURE_CLIENT_ID,
+  clientSecret: process.env.AZURE_CLIENT_SECRET,
+  tenantId: process.env.AZURE_TENANT_ID,
+  refreshToken: process.env.AZURE_REFRESH_TOKEN,
+});
+
+const teams = new Teams(); // Uses global config
+```
+
+### Pattern 3: Shared Authentication
+
+```typescript
+import { AzureAuth, Outlook, Teams } from "ms-graph-devtools";
 
 // Create shared auth instance
 const auth = new AzureAuth({ refreshToken: "your-token" });
@@ -655,34 +744,18 @@ await outlook.getMe();
 await teams.getTeams();
 ```
 
-### Pattern 3: Configuration-Based
-
-```typescript
-import { Outlook } from "smart-azure";
-
-const outlook = new Outlook({
-  clientId: process.env.AZURE_CLIENT_ID,
-  clientSecret: process.env.AZURE_CLIENT_SECRET,
-  tenantId: process.env.AZURE_TENANT_ID,
-  refreshToken: process.env.AZURE_REFRESH_TOKEN,
-});
-```
-
 ### Pattern 4: Task Automation
 
 ```typescript
-import { SharePoint, Teams } from "smart-azure";
-
-const sharepoint = new SharePoint();
-const teams = new Teams();
+import Azure from './config/azure';
 
 // Process task queue
-const tasks = await sharepoint.queryAndProcess(
+const tasks = await Azure.sharePoint.queryAndProcess(
   "NotificationQueue",
   "fields/status eq 'pending'",
   async (item) => {
     // Send notification to Teams
-    await teams
+    await Azure.teams
       .compose()
       .team(item.fields.teamId)
       .channel(item.fields.channelId)
@@ -695,6 +768,111 @@ const tasks = await sharepoint.queryAndProcess(
 );
 
 console.log(`Processed ${tasks.length} notifications`);
+```
+
+## 💡 Best Practices
+
+### 1. Use Global Instance Export Pattern
+
+**The recommended way to use this library:**
+
+```typescript
+// ✅ GOOD: Single config file pattern
+// config/azure.ts
+import Azure from 'ms-graph-devtools';
+
+Azure.config({
+  clientId: process.env.AZURE_CLIENT_ID,
+  clientSecret: process.env.AZURE_CLIENT_SECRET,
+  tenantId: process.env.AZURE_TENANT_ID,
+  tokenProvider: async (callback) => await getAuthCode(callback),
+});
+
+export default Azure;
+```
+
+```typescript
+// Everywhere else in your app
+import Azure from './config/azure';
+await Azure.outlook.sendMail({...});
+```
+
+**Why this is best:**
+- Single source of truth for configuration
+- No config duplication across files
+- Easier to maintain and update credentials
+- Consistent authentication across entire app
+- Simpler imports (just the instance, no config needed)
+
+**Avoid this pattern:**
+
+```typescript
+// ❌ BAD: Repeating config everywhere
+import { Outlook } from 'ms-graph-devtools';
+
+const outlook = new Outlook({
+  clientId: process.env.AZURE_CLIENT_ID,  // Repeated in every file
+  clientSecret: process.env.AZURE_CLIENT_SECRET,
+  tenantId: process.env.AZURE_TENANT_ID,
+  refreshToken: process.env.AZURE_REFRESH_TOKEN,
+});
+```
+
+### 2. Keep Config Separate from Business Logic
+
+**File structure:**
+```
+your-project/
+├── config/
+│   └── azure.ts          # Azure config + export
+├── src/
+│   ├── email.ts          # import Azure from '../config/azure'
+│   ├── notifications.ts  # import Azure from '../config/azure'
+│   └── reports.ts        # import Azure from '../config/azure'
+└── .env                  # Credentials (gitignored)
+```
+
+### 3. Use Environment Variables
+
+Always load credentials from environment variables, never hardcode:
+
+```typescript
+// config/azure.ts
+import Azure from 'ms-graph-devtools';
+import 'dotenv/config'; // If using dotenv
+
+Azure.config({
+  clientId: process.env.AZURE_CLIENT_ID!,
+  clientSecret: process.env.AZURE_CLIENT_SECRET!,
+  tenantId: process.env.AZURE_TENANT_ID!,
+  tokenProvider: async (callback) => await getAuthCode(callback),
+});
+
+export default Azure;
+```
+
+### 4. Type Safety with TypeScript
+
+```typescript
+// config/azure.ts
+import Azure from 'ms-graph-devtools';
+
+// Validate required env vars at startup
+const requiredEnvVars = ['AZURE_CLIENT_ID', 'AZURE_CLIENT_SECRET', 'AZURE_TENANT_ID'];
+for (const envVar of requiredEnvVars) {
+  if (!process.env[envVar]) {
+    throw new Error(`Missing required environment variable: ${envVar}`);
+  }
+}
+
+Azure.config({
+  clientId: process.env.AZURE_CLIENT_ID!,
+  clientSecret: process.env.AZURE_CLIENT_SECRET!,
+  tenantId: process.env.AZURE_TENANT_ID!,
+  tokenProvider: async (callback) => await getAuthCode(callback),
+});
+
+export default Azure;
 ```
 
 ## 🔒 Security Best Practices
@@ -749,17 +927,45 @@ Or see [REFRESH_TOKEN_SETUP.md](./REFRESH_TOKEN_SETUP.md) for manual instruction
 
 ## ❓ FAQ
 
-**Q: Do I need to call `init()` before every method?**
+**Q: What's the recommended way to use this library?**
 
-A: No! The singleton persists. But calling `init()` is safe and enables method chaining:
+A: **Export a configured global instance** - this is the best practice for 95% of use cases:
 
 ```typescript
-await Azure.init().getMe(); // Clean syntax
+// config/azure.ts - Configure once
+import Azure from 'ms-graph-devtools';
+Azure.config({...});
+export default Azure;
+
+// everywhere else - just import and use
+import Azure from './config/azure';
+await Azure.outlook.sendMail({...});
 ```
 
-**Q: What if I call `init()` multiple times with different tokens?**
+This gives you:
+- Single source of truth
+- No config duplication
+- Clean imports everywhere
+- Easy to maintain
 
-A: The first configuration wins (idempotent). Use `Azure.reset()` to reinitialize.
+**Q: Do I need to call `Azure.config()` every time I use a service?**
+
+A: No! That's the beauty of the global instance pattern. Call `Azure.config()` once in a config file, export the instance, then import and use it everywhere.
+
+```typescript
+// config/azure.ts - Call config() ONCE
+Azure.config({...});
+export default Azure;
+
+// other files - NO config() needed, just import
+import Azure from './config/azure';
+await Azure.outlook.sendMail({...});
+await Azure.teams.postMessage({...});
+```
+
+**Q: What if I call `config()` multiple times with different tokens?**
+
+A: Each call to `config()` replaces the previous configuration and resets all service instances. Use `Azure.reset()` first for clarity.
 
 **Q: Where are tokens stored?**
 
@@ -780,21 +986,21 @@ A: Yes! You obtain the refresh token once through your SSO, then the utility han
 
 A: Either:
 
-1. `Azure.reset()` then `Azure.init({ refreshToken: 'new-token' })`
-2. Delete the storage file and reinitialize with a new config
+1. `Azure.reset()` then `Azure.config({ refreshToken: 'new-token' })`
+2. Delete the storage file and call `Azure.config()` with new credentials
 
 ## 🐛 Troubleshooting
 
 ### "No refresh token available"
 
-**Solution:** Provide a token via one of these methods:
+**Solution:** Provide a token via `Azure.config()`:
 
 ```typescript
-Azure.init({ refreshToken: 'xxx' })
+Azure.config({ refreshToken: 'xxx' })
 // OR
-Azure.init({ tokenProvider: async () => 'xxx' })
-// OR load from storage (if previously saved)
-Azure.init()
+Azure.config({ tokenProvider: async (callback) => getAuthCode(callback) })
+// OR
+Azure.config({ accessToken: 'xxx' }) // Light mode
 ```
 
 ### "Invalid grant" error
