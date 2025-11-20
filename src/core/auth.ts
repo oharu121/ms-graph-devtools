@@ -429,24 +429,21 @@ export class AzureAuth {
       return;
     }
 
-    // Try loading from storage first (if no tokenProvider)
-    if (!this.tokenProvider) {
-      // Start the storage load and track the promise
-      this.storageLoadPromise = (async () => {
-        await this.loadFromStorage();
-      })();
+    // ALWAYS try loading from storage first (regardless of tokenProvider)
+    this.storageLoadPromise = (async () => {
+      await this.loadFromStorage();
+    })();
 
-      try {
-        await this.storageLoadPromise;
-        if (this.refreshToken) {
-          return;
-        }
-      } finally {
-        this.storageLoadPromise = null;
+    try {
+      await this.storageLoadPromise;
+      if (this.refreshToken) {
+        return;
       }
+    } finally {
+      this.storageLoadPromise = null;
     }
 
-    // Try tokenProvider via forgeRefreshToken (with race condition protection)
+    // Only use tokenProvider if storage didn't have tokens
     if (this.tokenProvider) {
       this.storageLoadPromise = (async () => {
         await this.forgeRefreshToken();

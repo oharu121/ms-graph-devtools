@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1]
+
+### Fixed
+- **Token Storage Priority** - Storage is now checked before calling tokenProvider
+  - Previously: When `tokenProvider` was configured, it was always called first, even if valid tokens existed in storage
+  - Now: Storage is ALWAYS checked first, `tokenProvider` only called when storage is empty
+  - This prevents unnecessary provider calls on subsequent runs after initial authentication
+  - Tokens from `tokenProvider` are still saved to storage for future use
+  - Results in much faster startup times when tokens are already cached
+
 ## [1.3.0]
 
 ### Added
