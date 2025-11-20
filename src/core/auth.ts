@@ -1,10 +1,10 @@
-import Axon, { AxonError } from "axios-fluent";
-import os from "os";
-import path from "path";
-import fs from "fs/promises";
-import { AzureConfig, StoredCredentials } from "../types";
+import Axon, { AxonError } from 'axios-fluent';
+import os from 'os';
+import path from 'path';
+import fs from 'fs/promises';
+import { AzureConfig, StoredCredentials } from '../types';
 
-const REDIRECT_URI = "https://oauth.pstmn.io/v1/callback";
+const REDIRECT_URI = 'https://oauth.pstmn.io/v1/callback';
 
 /**
  * Default OAuth scopes that work in 99% of cases without admin consent
@@ -28,16 +28,16 @@ const REDIRECT_URI = "https://oauth.pstmn.io/v1/callback";
  * Users can override these scopes by providing custom scopes in config
  */
 const DEFAULT_SCOPES = [
-  "openid",
-  "profile",
-  "offline_access",
-  "User.Read",
-  "Mail.Send",
-  "Mail.Read",
-  "Calendars.ReadWrite",
-  "Calendars.ReadWrite.Shared",
-  "ChannelMessage.Send",
-  "ChatMessage.Send",
+  'openid',
+  'profile',
+  'offline_access',
+  'User.Read',
+  'Mail.Send',
+  'Mail.Read',
+  'Calendars.ReadWrite',
+  'Calendars.ReadWrite.Shared',
+  'ChannelMessage.Send',
+  'ChatMessage.Send',
   // "Sites.ReadWrite.All", // ⚠️ Requires admin consent
 ];
 
@@ -49,15 +49,15 @@ export class AzureAuth {
   private static globalInstance: AzureAuth | null = null;
 
   private expiredAt?: number;
-  private refreshToken: string = "";
-  private accessToken: string = "";
+  private refreshToken: string = '';
+  private accessToken: string = '';
   private tokenRefreshPromise: Promise<void> | null = null;
   private storageLoadPromise: Promise<void> | null = null;
   private tokenProvider?: (callback: string) => Promise<string> | string;
   private storagePath: string;
-  private clientId: string = "";
-  private clientSecret: string = "";
-  private tenantId: string = "";
+  private clientId: string = '';
+  private clientSecret: string = '';
+  private tenantId: string = '';
   private isAccessTokenOnly: boolean = false;
   private scopes: string[] = DEFAULT_SCOPES;
   private scopesConfigured: boolean = false;
@@ -149,17 +149,27 @@ export class AzureAuth {
         );
       } else if (status === 404) {
         return new Error(
-          `Resource not found: ${data?.message || data?.error?.message || 'The requested item does not exist'}`
+          `Resource not found: ${
+            data?.message || data?.error?.message || 'The requested item does not exist'
+          }`
         );
       } else if (status === 409) {
-        return new Error(`Conflict: ${data?.message || data?.error?.message || 'An item with this name already exists'}`);
+        return new Error(
+          `Conflict: ${
+            data?.message || data?.error?.message || 'An item with this name already exists'
+          }`
+        );
       } else if (status === 403) {
         return new Error(
-          `Permission denied: ${data?.message || data?.error?.message || 'You do not have access to this resource'}`
+          `Permission denied: ${
+            data?.message || data?.error?.message || 'You do not have access to this resource'
+          }`
         );
       } else if (status && status >= 500) {
         return new Error(
-          `Microsoft server error (${status}): ${data?.message || data?.error?.message || 'Please try again later'}`
+          `Microsoft server error (${status}): ${
+            data?.message || data?.error?.message || 'Please try again later'
+          }`
         );
       }
     }
@@ -303,14 +313,12 @@ export class AzureAuth {
   private getStorageDirectory(): string {
     const homeDir = os.homedir();
 
-    if (process.platform === "win32") {
-      const localAppData =
-        process.env.LOCALAPPDATA || path.join(homeDir, "AppData", "Local");
-      return path.join(localAppData, "ms-graph-devtools");
+    if (process.platform === 'win32') {
+      const localAppData = process.env.LOCALAPPDATA || path.join(homeDir, 'AppData', 'Local');
+      return path.join(localAppData, 'ms-graph-devtools');
     } else {
-      const configHome =
-        process.env.XDG_CONFIG_HOME || path.join(homeDir, ".config");
-      return path.join(configHome, "ms-graph-devtools");
+      const configHome = process.env.XDG_CONFIG_HOME || path.join(homeDir, '.config');
+      return path.join(configHome, 'ms-graph-devtools');
     }
   }
 
@@ -325,7 +333,7 @@ export class AzureAuth {
       return path.join(baseDir, filename);
     }
 
-    return path.join(baseDir, "tokens.json");
+    return path.join(baseDir, 'tokens.json');
   }
 
   /**
@@ -359,15 +367,9 @@ export class AzureAuth {
       const dir = path.dirname(this.storagePath);
       await fs.mkdir(dir, { recursive: true, mode: 0o700 });
 
-      await fs.writeFile(
-        this.storagePath,
-        JSON.stringify(credentials, null, 2),
-        { mode: 0o600 }
-      );
-
-      console.info(`Credentials saved to ${this.storagePath}`);
+      await fs.writeFile(this.storagePath, JSON.stringify(credentials, null, 2), { mode: 0o600 });
     } catch (error) {
-      console.error("Failed to save credentials to storage:", error);
+      console.error('Failed to save credentials to storage:', error);
     }
   }
 
@@ -376,7 +378,7 @@ export class AzureAuth {
    */
   private async loadFromStorage(): Promise<boolean> {
     try {
-      const data = await fs.readFile(this.storagePath, "utf-8");
+      const data = await fs.readFile(this.storagePath, 'utf-8');
       const credentials: StoredCredentials = JSON.parse(data);
 
       this.refreshToken = credentials.refreshToken;
@@ -387,7 +389,6 @@ export class AzureAuth {
 
       this.updateStoragePath();
 
-      console.info(`Credentials loaded from storage: ${this.storagePath}`);
       return true;
     } catch {
       return false;
@@ -402,11 +403,11 @@ export class AzureAuth {
 
     if (!this.clientId || !this.clientSecret || !this.tenantId) {
       throw new Error(
-        "Missing required credentials. Please provide:\n" +
-          (!this.clientId ? "  - clientId\n" : "") +
-          (!this.clientSecret ? "  - clientSecret\n" : "") +
-          (!this.tenantId ? "  - tenantId\n" : "") +
-          "\nProvide via:\n" +
+        'Missing required credentials. Please provide:\n' +
+          (!this.clientId ? '  - clientId\n' : '') +
+          (!this.clientSecret ? '  - clientSecret\n' : '') +
+          (!this.tenantId ? '  - tenantId\n' : '') +
+          '\nProvide via:\n' +
           "1. new Service({ clientId: '...', clientSecret: '...', tenantId: '...' })\n" +
           "2. Azure.config({ clientId: '...', clientSecret: '...', tenantId: '...' })\n"
       );
@@ -469,7 +470,7 @@ export class AzureAuth {
       this.storageLoadPromise = (async () => {
         await this.forgeRefreshToken();
         await this.saveToStorage();
-        console.info("Obtained tokens from token provider");
+        console.info('Obtained tokens from token provider');
       })();
       try {
         await this.storageLoadPromise;
@@ -480,14 +481,14 @@ export class AzureAuth {
     }
 
     throw new Error(
-      "No refresh token available. Please provide one via:\n" +
+      'No refresh token available. Please provide one via:\n' +
         "1. new Service({ refreshToken: 'your-token' })\n" +
         "2. Azure.config({ refreshToken: 'your-token' })\n" +
-        "3. Saved storage file at: " +
+        '3. Saved storage file at: ' +
         this.storagePath +
-        "\n" +
-        "4. tokenProvider function\n\n" +
-        "See documentation for how to obtain a refresh token."
+        '\n' +
+        '4. tokenProvider function\n\n' +
+        'See documentation for how to obtain a refresh token.'
     );
   }
 
@@ -528,13 +529,13 @@ export class AzureAuth {
   private async forgeRefreshToken(): Promise<void> {
     if (!this.tokenProvider) {
       throw new Error(
-        "No token provider configured. Please provide one via:\n" +
-          "1. new Service({ tokenProvider: async (callback) => { ... } })\n" +
+        'No token provider configured. Please provide one via:\n' +
+          '1. new Service({ tokenProvider: async (callback) => { ... } })\n' +
           "2. Provide refreshToken directly: new Service({ refreshToken: '...' })\n" +
-          "\nExample with Playwright:\n" +
-          "  new Outlook({\n" +
-          "    tokenProvider: async (callback) => await Playwright.getAzureCode(callback)\n" +
-          "  })\n"
+          '\nExample with Playwright:\n' +
+          '  new Outlook({\n' +
+          '    tokenProvider: async (callback) => await Playwright.getAzureCode(callback)\n' +
+          '  })\n'
       );
     }
 
@@ -542,11 +543,11 @@ export class AzureAuth {
       `https://login.microsoftonline.com/${this.tenantId}/oauth2/v2.0/authorize?` +
       [
         `client_id=${this.clientId}`,
-        "response_type=code",
+        'response_type=code',
         `redirect_uri=${REDIRECT_URI}`,
-        `scope=${this.scopes.join("%20")}`,
-        "response_mode=query",
-      ].join("&");
+        `scope=${this.scopes.join('%20')}`,
+        'response_mode=query',
+      ].join('&');
 
     const code = await this.tokenProvider(callback);
 
@@ -557,29 +558,23 @@ export class AzureAuth {
       client_secret: this.clientSecret,
       code: code,
       redirect_uri: REDIRECT_URI,
-      grant_type: "authorization_code",
-      scope: this.scopes.join(" "),
+      grant_type: 'authorization_code',
+      scope: this.scopes.join(' '),
     };
 
     try {
-      const res = await this.getAxon()
-        .encodeUrl()
-        .post(url, reqTokenBody);
+      const res = await this.getAxon().encodeUrl().post(url, reqTokenBody);
 
       if (res.status === 200) {
         this.accessToken = res.data.access_token;
         this.expiredAt = Date.now() + res.data.expires_in * 1000;
         this.refreshToken = res.data.refresh_token;
       } else {
-        console.error(
-          `Failed to forge refresh token: ${res.status} ${JSON.stringify(
-            res.data
-          )}`
-        );
-        throw new Error("Failed to forge refresh token");
+        console.error(`Failed to forge refresh token: ${res.status} ${JSON.stringify(res.data)}`);
+        throw new Error('Failed to forge refresh token');
       }
     } catch (error) {
-      console.error("Error forging refresh token:", error);
+      console.error('Error forging refresh token:', error);
       throw error;
     }
   }
@@ -592,17 +587,15 @@ export class AzureAuth {
 
     const reqTokenBody = {
       client_id: this.clientId,
-      scope: this.scopes.join(" "),
+      scope: this.scopes.join(' '),
       refresh_token: this.refreshToken,
       redirect_uri: REDIRECT_URI,
-      grant_type: "refresh_token",
+      grant_type: 'refresh_token',
       client_secret: this.clientSecret,
     };
 
     try {
-      const res = await this.getAxon()
-        .encodeUrl()
-        .post(url, reqTokenBody);
+      const res = await this.getAxon().encodeUrl().post(url, reqTokenBody);
 
       if (res.status === 200) {
         this.accessToken = res.data.access_token;
@@ -615,16 +608,12 @@ export class AzureAuth {
           this.refreshToken = res.data.refresh_token;
         }
       } else {
-        console.error(
-          `Failed to refresh access token: ${res.status} ${JSON.stringify(
-            res.data
-          )}`
-        );
-        throw new Error("Failed to refresh access token");
+        console.error(`Failed to refresh access token: ${res.status} ${JSON.stringify(res.data)}`);
+        throw new Error('Failed to refresh access token');
       }
     } catch (error) {
-      console.error("Error refreshing access token:", error);
-      throw new Error("Failed to refresh access token");
+      console.error('Error refreshing access token:', error);
+      throw new Error('Failed to refresh access token');
     }
   }
 
@@ -634,10 +623,10 @@ export class AzureAuth {
   handleApiError(error: AxonError): never {
     if (this.isAccessTokenOnly && error.status === 401) {
       throw new Error(
-        "Access token is invalid or expired.\n\n" +
-          "To continue:\n" +
+        'Access token is invalid or expired.\n\n' +
+          'To continue:\n' +
           "  1. Provide a new access token: new Service({ accessToken: 'new-token' })\n" +
-          "  2. For automatic renewal, see documentation on using refresh tokens\n"
+          '  2. For automatic renewal, see documentation on using refresh tokens\n'
       );
     }
     throw error;
@@ -655,10 +644,10 @@ export class AzureAuth {
     try {
       const files = await fs.readdir(baseDir);
       return files
-        .filter((f) => f.startsWith("tokens") && f.endsWith(".json"))
+        .filter((f) => f.startsWith('tokens') && f.endsWith('.json'))
         .map((file) => {
-          const parts = file.split(".");
-          if (parts.length === 4 && parts[0] === "tokens") {
+          const parts = file.split('.');
+          if (parts.length === 4 && parts[0] === 'tokens') {
             return {
               tenantId: parts[1],
               clientId: parts[2],
@@ -675,10 +664,7 @@ export class AzureAuth {
   /**
    * Clear stored credentials
    */
-  static async clearStoredCredentials(
-    tenantId?: string,
-    clientId?: string
-  ): Promise<void> {
+  static async clearStoredCredentials(tenantId?: string, clientId?: string): Promise<void> {
     const instance = new AzureAuth();
     const baseDir = instance.getStorageDirectory();
 
@@ -687,25 +673,17 @@ export class AzureAuth {
         const filename = `tokens.${tenantId}.${clientId}.json`;
         const filePath = path.join(baseDir, filename);
         await fs.unlink(filePath);
-        console.info(
-          `Cleared credentials for tenant=${tenantId}, client=${clientId}`
-        );
+        console.info(`Cleared credentials for tenant=${tenantId}, client=${clientId}`);
       } else {
         const files = await fs.readdir(baseDir);
-        const tokenFiles = files.filter(
-          (f) => f.startsWith("tokens") && f.endsWith(".json")
-        );
+        const tokenFiles = files.filter((f) => f.startsWith('tokens') && f.endsWith('.json'));
 
-        await Promise.all(
-          tokenFiles.map((file) => fs.unlink(path.join(baseDir, file)))
-        );
-        console.info(
-          `Cleared all stored credentials (${tokenFiles.length} files)`
-        );
+        await Promise.all(tokenFiles.map((file) => fs.unlink(path.join(baseDir, file))));
+        console.info(`Cleared all stored credentials (${tokenFiles.length} files)`);
       }
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-        console.error("Failed to clear credentials:", error);
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        console.error('Failed to clear credentials:', error);
       }
     }
   }
