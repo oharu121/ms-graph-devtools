@@ -1,25 +1,32 @@
 version: 2
 updates:
   # Check for npm dependency updates
-  - package-ecosystem: 'npm'
-    directory: '/'
+  - package-ecosystem: "npm"
+    directory: "/"
     schedule:
-      interval: 'weekly'
+      interval: "weekly"
+    # Group all minor and patch updates together, keep major separate for review
+    groups:
+      dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
     open-pull-requests-limit: 10
     labels:
-      - 'dependencies'
-    # Group all development dependencies together
-    groups:
-      dev-dependencies:
-        dependency-type: 'development'
+      - "dependencies"
+      - "npm"
 
   # Check for GitHub Actions updates
-  - package-ecosystem: 'github-actions'
-    directory: '/'
+  - package-ecosystem: "github-actions"
+    directory: "/"
     schedule:
-      interval: 'weekly'
-    # Group all actions together
+      interval: "weekly"
     groups:
       actions:
         patterns:
-          - '*'
+          - "*"
+    labels:
+      - "dependencies"
+      - "github-actions"
