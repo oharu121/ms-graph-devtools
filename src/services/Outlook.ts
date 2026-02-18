@@ -1,3 +1,4 @@
+import { AxiosResponse } from "axios";
 import dayjs from "dayjs";
 import { JSDOM } from "jsdom";
 import * as fs from "fs";
@@ -81,7 +82,7 @@ export class Outlook {
    *   }
    * });
    */
-  async sendMail(payload: MailPayload) {
+  async sendMail(payload: MailPayload): Promise<AxiosResponse> {
     await this.auth.checkToken();
     return this.auth.withRetry(async () => {
       const token = await this.auth.getAccessToken();
@@ -346,7 +347,8 @@ export class MailBuilder {
       } catch (error) {
         console.error(`Error processing attachment:`, error);
         throw new Error(
-          `Failed to process attachment: ${typeof item === "string" ? item : item.name}`
+          `Failed to process attachment: ${typeof item === "string" ? item : item.name}`,
+          { cause: error }
         );
       }
     }
@@ -401,7 +403,7 @@ export class MailBuilder {
    *
    * @returns Axios response from Microsoft Graph API
    */
-  async send() {
+  async send(): Promise<AxiosResponse> {
     return await this.outlook.sendMail(this.payload);
   }
 

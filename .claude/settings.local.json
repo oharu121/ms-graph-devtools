@@ -5,7 +5,10 @@
       "Bash(npm pack:*)",
       "Bash(npm run build:*)",
       "Bash(npm run typecheck:*)",
-      "Bash(npm run lint:*)"
+      "Bash(npm run lint:*)",
+      "Bash(pnpm add:*)",
+      "Bash(pnpm run typecheck)",
+      "Bash(pnpm run lint)"
     ],
     "deny": [
       "Bash(npm test:*)"

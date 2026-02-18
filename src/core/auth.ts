@@ -613,7 +613,7 @@ export class AzureAuth {
       }
     } catch (error) {
       console.error('Error refreshing access token:', error);
-      throw new Error('Failed to refresh access token');
+      throw new Error('Failed to refresh access token', { cause: error });
     }
   }
 
