@@ -73,7 +73,7 @@
     "@vitest/ui": "^4.0.10",
     "eslint": "^10.0.0",
     "eslint-config-prettier": "^10.1.8",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.2",
     "vitest": "^4.0.10"
   },
   "dependencies": {
